@@ -8,4 +8,15 @@
                  [org.clojure/data.json "0.2.6"]]
   :main jepsen.dyntables
   :target-path "target/%s"
+  :jvm-opts ["-Xmx50g"
+             "-XX:+UseConcMarkSweepGC"
+             "-XX:+UseParNewGC"
+             "-XX:+CMSParallelRemarkEnabled"
+             "-XX:+AggressiveOpts"
+             "-XX:+UseFastAccessorMethods"
+             "-XX:MaxInlineLevel=32"
+             "-XX:MaxRecursiveInlineLevel=2"
+             "-XX:+UnlockCommercialFeatures"
+;             "-XX:-OmitStackTraceInFastThrow"
+             "-server"]
   :profiles {:uberjar {:aot :all}})
