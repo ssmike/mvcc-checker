@@ -4,6 +4,8 @@
   (:require [clojure.tools.logging :refer :all]
             [clojure.java.io    :as io]
             [clojure.string     :as str]
+            [clojure.set        :as set]
+            [jepsen.os.debian   :as debian]
             [jepsen [db         :as db]
                     [cli        :as cli]
                     [checker    :as checker]
@@ -12,13 +14,9 @@
                     [generator  :as gen]
                     [nemesis    :as nemesis]
                     [tests      :as tests]
-                    [util       :refer [timeout]]]
-            [jepsen.os.debian   :as debian]
-            [knossos.model      :as model]
-            [jepsen.yt          :as yt]
-            [knossos.model :as knossos]))
-
-(def inconsistent knossos/inconsistent)
+                    [util       :refer [timeout]]
+                    [yt         :as yt]
+                    [yt_models  :as models]]))
 
 (def db
   (reify db/DB
@@ -53,79 +51,44 @@
         (merge op (yt/ysend con op))))
     (teardown! [_ test] (yt/close con))))
 
-(defrecord Dict [dict]
-  Model
-  (step [m op]
-    (let [op-val (:value op)
-          {key "key" val "val"} op-val]
-      (case (:f op)
-        :dyn-table-read (do
-                          (assert key (str op))
-                          (if (= (get dict key) val)
-                          m
-                          (inconsistent (str "can't read " val " with key " key))))
-        :dyn-table-write (Dict. (assoc dict key val))
-        :dyn-table-cas  (let [[from-key to-key] key
-                              [from-val to-val] val]
-                              (assert to-val (str op val))
-                              (assert to-key (str op key))
-                              (assert from-key (str op key))
-                              (if (contains? dict from-key)
-                                (let [res (mod (+ to-val (get dict from-key)) 5)]
-                                  (Dict. (assoc dict to-key res)))
-                                (inconsistent (str "can't cas with " from-key))))))))
-
-(defn empty-dict
-  []
-  (Dict. {}))
-
-(def yt-keys
-  {0 2
-   1 21
-   2 31})
-
-(defn rand-key
-  []
-  (get yt-keys (rand-int 3)))
-
 (defn r-gen   [_ _] {:type :invoke :f :dyn-table-read
-                     :value {"key" (rand-key)}})
+                     :value {"key" (rand-int 3)}})
 (defn w-gen   [_ _] {:type :invoke :f :dyn-table-write
-                     :value {"val" (rand-int 5) :key (rand-key)}})
+                     :value {"val" (rand-int 5) :key (rand-int 3)}})
 (defn cas-gen [_ _] {:type :invoke :f :dyn-table-cas
-                     :value {"val" [(rand-int 5) (rand-int 5)]
-                             "key" [(rand-key) (rand-key)]}})
-
+                     :value {"val" [nil (rand-int 5)]
+                             "key" [(rand-int 3) (rand-int 3)]}})
 
 (defn d-test
   "Given an options map from the command-line runner (e.g. :nodes, :ssh,
   :concurrency, ...), constructs a test map."
   [opts]
-  (info "Creating test" opts)
-  (merge tests/noop-test
-         opts
-         {:nodes   [:n1 :n2 :n3 :n4 :n5 :master]
-          :name    "Dyntables"
-          :os      debian/os
-          :db      db
-          :client  (client nil)
-          :nemesis (nemesis/partition-random-halves)
-          :timeout 60
-          :generator (->> (gen/mix [r-gen w-gen cas-gen cas-gen])
-                          (gen/stagger 1)
-                          (gen/nemesis
-                            (gen/seq (cycle [(gen/sleep 9)
-                                             {:type :info, :f :start}
-                                             (gen/sleep 9)
-                                             {:type :info, :f :stop}])))
-                          (gen/time-limit 60))
-          :model   (empty-dict)
-          :checker (checker/compose
-                     {:perf   (checker/perf)
-                      :linear checker/linearizable})
-          :ssh {:username "root",
-                :strict-host-key-checking false,
-                :private-key-path "~/.ssh/yt"}}))
+  (let [pre-test (merge tests/noop-test opts)
+        timeout (:time-limit pre-test)
+        test (merge pre-test
+               {:nodes   [:n1 :n2 :n3 :n4 :n5 :master]
+                :name    "Dyntables"
+                :os      debian/os
+                :db      db
+                :client  (client nil)
+                :nemesis (nemesis/partition-random-halves)
+                :timeout timeout
+                :generator (->> (gen/mix [r-gen w-gen cas-gen cas-gen])
+                                (gen/stagger 1)
+                                (gen/nemesis
+                                  (gen/seq (cycle [(gen/sleep 9)
+                                                   {:type :info, :f :start}
+                                                   (gen/sleep 9)
+                                                   {:type :info, :f :stop}])))
+                                (gen/time-limit timeout))
+                :model   models/empty-dict
+                :checker (checker/compose
+                           {:perf   (checker/perf)
+                            :linear checker/linearizable})
+                :ssh {:username "root",
+                      :strict-host-key-checking false,
+                      :private-key-path "~/.ssh/yt"}})]
+    test))
 
 (defn -main
   "Handles command line arguments. Can either run a test, or a web server for
