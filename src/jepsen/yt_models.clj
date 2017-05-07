@@ -26,7 +26,7 @@
                              (Dict. (assoc dict to-key res)))
                            (inconsistent (str "can't cas with " from-key))))))))
 
-(def empty-dict (Dict. {}))
+(def empty-dict (Dict. {0 1 1 1 2 1}))
 
 (defrecord LockedDict [dict locks]
   Model
@@ -44,6 +44,7 @@
             (LockedDict. new-dict new-locks))
         (inconsistent "can't change lock state: locking " bad-locks " unlocking " bad-unlocks)))))
 
+(def empty-locked-dict (LockedDict. {0 1 1 1 2 1} #{}))
 
 (def ^:dynamic current-history)
 (def ^:dynamic current-operation)
