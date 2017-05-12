@@ -122,11 +122,7 @@
                                                          (_read {from-key from-val})
                                                          (_write {to-key (new-val)})
                                                          (_unlock #{to-key}))
-                                                   :fail (do
-                                                           (_read {from-key from-val})
-                                                           ;; ensure that somebody has taken the lock
-                                                           (_unlock #{to-key})
-                                                           (_lock #{to-key}))
+                                                   :fail (_read {from-key from-val})
                                                    :info (if (not (nil? from-val))
                                                            (do
                                                              (_lock #{to-key})
