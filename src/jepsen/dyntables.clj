@@ -51,14 +51,6 @@
         (merge op (yt/ysend con op))))
     (teardown! [_ test] (yt/close con))))
 
-(defn r-gen   [_ _] {:type :invoke :f :dyn-table-read
-                     :value {"key" (rand-int 3)}})
-(defn w-gen   [_ _] {:type :invoke :f :dyn-table-write
-                     :value {"val" (rand-int 5) :key (rand-int 3)}})
-(defn cas-gen [_ _] {:type :invoke :f :dyn-table-cas
-                     :value {"val" [nil (rand-int 5)]
-                             "key" [(rand-int 3) (rand-int 3)]}})
-
 (defn d-test
   "Given an options map from the command-line runner (e.g. :nodes, :ssh,
   :concurrency, ...), constructs a test map."
@@ -73,18 +65,18 @@
                 :client  (client nil)
                 :nemesis (nemesis/partition-random-halves)
                 :timeout timeout
-                :generator (->> (gen/mix [r-gen w-gen cas-gen cas-gen])
-                                (gen/stagger 1)
+                :generator (->> (models/dyntables-gen)
+                                (gen/stagger 0.2)
                                 (gen/nemesis
                                   (gen/seq (cycle [(gen/sleep 9)
                                                    {:type :info, :f :start}
                                                    (gen/sleep 9)
                                                    {:type :info, :f :stop}])))
                                 (gen/time-limit timeout))
-                :model   models/empty-dict
+                :model   models/empty-locked-dict
                 :checker (checker/compose
                            {:perf   (checker/perf)
-                            :linear checker/linearizable})
+                            :linear models/snapshot-serializable})
                 :ssh {:username "root",
                       :strict-host-key-checking false,
                       :private-key-path "~/.ssh/yt"}})]

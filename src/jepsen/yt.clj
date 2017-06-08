@@ -1,8 +1,7 @@
 (ns jepsen.yt
   (:gen-class)
   (:require [clojure.data.json :as json]
-            [clojure.java.io :as io]
-            [clojure.java.shell :as sh])
+            [clojure.java.io :as io])
   [:import java.lang.Runtime])
 
 (defn encode
