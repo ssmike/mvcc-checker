@@ -2,6 +2,7 @@
   (:gen-class)
   (:require [clojure.set :as set]
             [knossos.model :as knossos]
+            [clojure.tools.logging :refer [info warn error]]
             [jepsen.checker :as checker]
             [jepsen.generator :as gen])
   (:import (knossos.model Model)))
@@ -19,7 +20,7 @@
       (if (contains? @writing-processes process)
         (do
           (swap! writing-processes disj process)
-          (:f :write-and-unlock :value [(gen-key) (gen-cell-val)]))
+          {:f :write-and-unlock :value [(gen-key) (gen-cell-val)]})
         (do
           (swap! writing-processes conj process)
           {:f :read-and-lock :value [(gen-key) nil]})))))
@@ -68,20 +69,44 @@
                     (if (and (= (:f op) :read-and-lock)
                              (not (nil? write-op))
                              (not= (:type write-op) :fail))
-                      (let [locked (assoc op :value (conj op-val 
+                      (let [locked (assoc op :value (conj op-val
                                                ;; we are locking written cell
                                                (get (:value write-op) 0)))
-                            unlocked (assoc op :terminates (:process op))]
+                            unlocked (assoc op :blocks (:process op))]
+                        (info "found read-write pair")
                         (if (= (:type write-op) :ok)
                           locked
-                          [locked unlocked])
-                      op)))
-          (reverse history)))
+                          (do
+                            (info "expanding read-op")
+                            [locked unlocked])))
+                      op))))
+          (reverse history))
     (-> new-history
         persistent!
-        reverse))))
+        reverse)))
+
+(defn terminate-markers
+  [history]
+  (let [new-history (transient [])
+        seen-processes (transient #{})]
+    (run! (fn [op]
+            (conj! new-history
+              (let [proc (:process op)]
+                (if (seen-processes proc)
+                  op
+                  (do
+                    (if (= (:type op) :invoke)
+                      (conj! seen-processes proc))
+                    (assoc op :terminates proc))))))
+      (reverse history))
+    (-> new-history
+        persistent!
+        reverse)))
 
 (def snapshot-serializable
   (reify checker/Checker
     (check [this test model history opts]
-      (checker/check checker/linearizable test model (foldup-locks history) opts))))
+      (let [new-history (-> history
+                            terminate-markers
+                            foldup-locks)]
+      (checker/check checker/linearizable test model new-history opts)))))
