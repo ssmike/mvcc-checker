@@ -13,7 +13,7 @@
 (defn gen-cell-val [] (rand-int max-cell-val))
 (defn gen-key [] (rand-int 3))
 
-(defrecord DynGenerator[writing-processes]
+(defrecord DynGenerator [writing-processes]
   gen/Generator
   (op [this test process]
     (merge {:type :invoke}
@@ -34,7 +34,7 @@
       (case (:f op)
         :read-and-lock
           (cond
-            (contains? locks lock)
+            (locks lock)
               (inconsistent (str "can't lock " lock))
             (not= (get dict key) val)
               (inconsistent (str "can't read " val " from " key))
@@ -45,7 +45,7 @@
                     new-dict (assoc dict key val)]
                 (LockedDict. dict locks)))
         :write-and-unlock
-          (if (not (contains? locks key))
+          (if (not (locks key))
             (inconsistent (str "writing to unlocked " lock))
             (LockedDict. (disj locks key)
                          (assoc dict key val)))))))
@@ -70,18 +70,15 @@
                              (not (nil? write-op))
                              (not= (:type write-op) :fail))
                       (let [locked (assoc op :value (conj op-val
-                                               ;; we are locking written cell
-                                               (get (:value write-op) 0)))
+                                                     ;; we are locking written cell
+                                                     (get (:value write-op) 0)))
                             unlocked (assoc op :blocks (:process op))]
-                        (info "found read-write pair")
                         (if (= (:type write-op) :ok)
                           locked
-                          (do
-                            (info "expanding read-op")
-                            [locked unlocked])))
+                          [locked unlocked]))
                       op))))
           (reverse history))
-    (-> new-history
+    (->> new-history
         persistent!
         reverse)))
 
