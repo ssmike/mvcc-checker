@@ -1,13 +1,19 @@
 (ns jepsen.yt_models
   (:gen-class)
   (:require [clojure.set :as set]
-            [knossos.model :as knossos]
             [clojure.tools.logging :refer [info warn error]]
-            [jepsen.checker :as checker]
-            [jepsen.generator :as gen])
+            [jepsen [checker :as checker]
+                    [util :as util]
+                    [generator :as gen]
+                    [store :as store]]
+            [knossos [model :as model]
+                     [op :as op]
+                     [linear :as linear]
+                     [history :as history]]
+            [knossos.linear.report :as report])
   (:import (knossos.model Model)))
 
-(def inconsistent knossos/inconsistent)
+(def inconsistent model/inconsistent)
 
 (def max-cell-val 3)
 (defn gen-cell-val [] (rand-int max-cell-val))
@@ -105,5 +111,16 @@
     (check [this test model history opts]
       (let [new-history (-> history
                             terminate-markers
-                            foldup-locks)]
-      (checker/check checker/linearizable test model new-history opts)))))
+                            foldup-locks)
+            result (linear/analysis model history)]
+        ;; Just aphyr's code from jepsen.checker
+        (when-not (:valid? result)
+          (util/meh
+            ; Renderer can't handle really broad concurrencies yet
+            (report/render-analysis!
+              history result (.getCanonicalPath (store/path! test (:subdirectory opts)
+                                                      "linear.svg")))))
+        ; Writing these can take *hours* so we truncate
+        (assoc result
+               :final-paths (take 10 (:final-paths result))
+               :configs     (take 10 (:configs result)))))))
