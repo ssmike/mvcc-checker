@@ -47,7 +47,7 @@
           (info "yt proxy set up")
           (client sock)))
     (invoke! [this test op]
-      (timeout 3000 (assoc op :type :info, :error :timeout)
+      (timeout 5000 (assoc op :type :info, :error :timeout)
         (merge op (yt/ysend con op))))
     (teardown! [_ test] (yt/close con))))
 
@@ -68,9 +68,9 @@
                 :generator (->> (models/dyntables-gen)
                                 (gen/stagger 0.2)
                                 (gen/nemesis
-                                  (gen/seq (cycle [(gen/sleep 9)
+                                  (gen/seq (cycle [(gen/sleep 6)
                                                    {:type :info, :f :start}
-                                                   (gen/sleep 9)
+                                                   (gen/sleep 6)
                                                    {:type :info, :f :stop}])))
                                 (gen/time-limit timeout))
                 :model   models/empty-locked-dict
