@@ -52,7 +52,7 @@
                 (binding [*in* out]
                   (loop []
                     (let [{id :req-id :as msg} (decode (read-line))]
-                      (deliver (get @cache id) msg))
+                      (deliver (@cache id) msg))
                     (recur))))]
     {:in (io/writer (. proc getOutputStream))
      :cache cache

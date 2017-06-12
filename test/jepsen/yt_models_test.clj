@@ -1,11 +1,12 @@
 (ns jepsen.yt_models-test
   (:require [clojure.test :refer :all]
             [clojure.tools.logging :refer [info warn error]]
-            [jepsen [yt_models :as models]
+            [jepsen [yt_models :as yt]
                     [checker    :as checker]
                     [generator  :as gen]
                     [tests :as tests]]
-            [knossos.linear :as linear]))
+            [knossos [linear :as linear]
+                     [model :as model]]))
 
 (defn set-process
   ([history]
@@ -47,32 +48,27 @@
      {:type :invoke :f :write-and-unlock :value [0 0]}
      {:type :info :f :write-and-unlock :value [0 0]}]))
 
-(defn mix-histories
-  [histories])
-
 (defn pretty-print
   [list]
   (run! println list))
 
-(deftest one-line-success-test
+;; just make sure that history generators don't thorow exceptions
+(deftest one-line-history-test
   (run! (fn [hist] (-> hist
-                       models/terminate-markers
-                       models/foldup-locks
+                       yt/terminate-markers
+                       yt/foldup-locks
                        pretty-print)
                    (println))
        [one-line-success
         one-line-read-failure
         one-line-write-failure]))
 
-(def jepsen-mock-test
-  (merge tests/noop-test {:name "mock-test"}))
-
 (defmacro test-line
   [history]
   `(->> ~history
-        models/terminate-markers
-        models/foldup-locks
-        (linear/analysis models/empty-locked-dict)))
+        yt/terminate-markers
+        yt/foldup-locks
+        (linear/analysis yt/empty-locked-dict)))
 
 (deftest checker-test
   (is (:valid? (test-line one-line-success)))

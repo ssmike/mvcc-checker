@@ -42,19 +42,19 @@
           (cond
             (locks lock)
               (inconsistent (str "can't lock " lock))
-            (not= (get dict key) val)
+            (not= (dict key) val)
               (inconsistent (str "can't read " val " from " key))
             true
               (let [new-locks (if (nil? lock)
                                 locks
                                 (conj locks lock))
                     new-dict (assoc dict key val)]
-                (LockedDict. dict locks)))
+                (LockedDict. new-dict new-locks)))
         :write-and-unlock
-          (if (not (locks key))
-            (inconsistent (str "writing to unlocked " lock))
-            (LockedDict. (disj locks key)
-                         (assoc dict key val)))))))
+          (if (locks key)
+            (LockedDict. (assoc dict key val)
+                         (disj locks key))
+            (inconsistent (str "writing to unlocked " lock)))))))
 
 (def empty-locked-dict (LockedDict. {0 1
                                      1 1
@@ -71,13 +71,13 @@
               (assoc! last-write (:process op) op))
             (conj! new-history
                 (let [op-val (:value op)
-                      write-op (get last-write (:process op))]
+                      write-op (last-write (:process op))]
                     (if (and (= (:f op) :read-and-lock)
                              (not (nil? write-op))
                              (not= (:type write-op) :fail))
                       (let [locked (assoc op :value (conj op-val
                                                      ;; we are locking written cell
-                                                     (get (:value write-op) 0)))
+                                                     ((:value write-op) 0)))
                             unlocked (assoc op :blocks (:process op))]
                         (if (= (:type write-op) :ok)
                           locked
