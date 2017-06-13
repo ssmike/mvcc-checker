@@ -78,10 +78,11 @@
                       (let [locked (assoc op :value (conj op-val
                                                      ;; we are locking written cell
                                                      ((:value write-op) 0)))
-                            unlocked (assoc op :blocks (:process op))]
+                            unlocked {:blocks (:process op)
+                                      :value (:value op)}]
                         (if (= (:type write-op) :ok)
                           locked
-                          [locked unlocked]))
+                          (assoc locked :branches [unlocked])))
                       op))))
           (reverse history))
     (->> new-history
