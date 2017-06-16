@@ -4,9 +4,8 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [jepsen "0.1.6-SNAPSHOT" :exclusions [knossos]]
-                 [org.clojure/data.json "0.2.6"]
-                 [knossos "0.2.9-SNAPSHOT" :exclusions [org.slf4j/slf4j-log4j12]]] ;;override aphyr's unpatched version
+                 [jepsen "0.1.6-SNAPSHOT"]
+                 [org.clojure/data.json "0.2.6"]]
   :main jepsen.dyntables
   :target-path "target/%s"
   :jvm-opts ["-Xmx50g"

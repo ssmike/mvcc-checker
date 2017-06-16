@@ -1,16 +1,15 @@
-(ns jepsen.yt_models
+(ns jepsen.yt-models
   (:gen-class)
-  (:require [clojure.set :as set]
+  (:require [clojure.java.io :as io]
+            [clojure.set :as set]
             [clojure.tools.logging :refer [info warn error]]
-            [jepsen [checker :as checker]
-                    [util :as util]
+            [jepsen [util :as util]
                     [generator :as gen]
-                    [store :as store]]
-            [knossos [model :as model]
-                     [op :as op]
-                     [linear :as linear]
-                     [history :as history]]
-            [knossos.linear.report :as report])
+                    [store :as store]
+                    [checker :as checker]]
+            [knossos.model :as model]
+            [jepsen.dyntables.memo :as memo]
+            [jepsen.dyntables.checker-middleware :as middleware])
   (:import (knossos.model Model)))
 
 (def inconsistent model/inconsistent)
@@ -78,50 +77,53 @@
                       (let [locked (assoc op :value (conj op-val
                                                      ;; we are locking written cell
                                                      ((:value write-op) 0)))
-                            unlocked {:blocks (:process op)
-                                      :value (:value op)}]
+                            unlocked (assoc op :blocks true)]
                         (if (= (:type write-op) :ok)
-                          locked
-                          (assoc locked :branches [unlocked])))
-                      op))))
+                          [locked]
+                          [unlocked locked]))
+                      [op]))))
           (reverse history))
-    (->> new-history
+    (-> new-history
         persistent!
         reverse)))
 
-(defn terminate-markers
+(defn merge-success
+  [invoke-ops ok-ops]
+  (mapv (fn [invoke-op ok-op]
+          (assoc invoke-op :value (:value ok-op))) invoke-ops ok-ops))
+
+(defn complete-history
   [history]
-  (let [new-history (transient [])
-        seen-processes (transient #{})]
-    (run! (fn [op]
-            (conj! new-history
-              (let [proc (:process op)]
-                (if (seen-processes proc)
-                  op
-                  (do
-                    (if (= (:type op) :invoke)
-                      (conj! seen-processes proc))
-                    (assoc op :terminates proc))))))
-      (reverse history))
+  (let [cache (transient {})
+        new-history (transient [])]
+    (doseq [op (reverse history)]
+      (let [p (:process op)]
+        (case (-> op first :type)
+          :ok (do
+                (assoc! cache p op)
+                (conj! new-history op))
+          :fail (assoc! cache p :fail)
+          :info (assoc! cache p op)
+          :invoke (if (not= (cache p) :fail)
+                    (conj! new-history
+                           (merge-success op
+                                          (cache p)))))))
     (-> new-history
         persistent!
         reverse)))
 
 (def snapshot-serializable
   (reify checker/Checker
-    (check [this test model history opts]
-      (let [new-history (-> history
-                            terminate-markers
-                            foldup-locks)
-            result (linear/analysis model history)]
-        ;; Just aphyr's code from jepsen.checker
-        (when-not (:valid? result)
-          (util/meh
-            ; Renderer can't handle really broad concurrencies yet
-            (report/render-analysis!
-              history result (.getCanonicalPath (store/path! test (:subdirectory opts)
-                                                      "linear.svg")))))
-        ; Writing these can take *hours* so we truncate
-        (assoc result
-               :final-paths (take 10 (:final-paths result))
-               :configs     (take 10 (:configs result)))))))
+    (check [this test model orig-history opts]
+      (let [history (-> orig-history
+                        foldup-locks
+                        complete-history)
+            memo (memo/memo model history)
+            ;res (middleware/run-checker! (:history memo)
+            ;                          (:transitions memo))
+            res (middleware/dump-logs! (:history memo)
+                                       (:transitions memo))]
+        (with-open [w (io/writer "jepsen-op-log")]
+          (doseq [h orig-history]
+            (.write w (str h "\n"))))
+        res))))

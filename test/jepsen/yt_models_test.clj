@@ -1,12 +1,13 @@
-(ns jepsen.yt_models-test
+(ns jepsen.yt-models-test
   (:require [clojure.test :refer :all]
             [clojure.tools.logging :refer [info warn error]]
-            [jepsen [yt_models :as yt]
+            [jepsen [yt-models :as yt]
                     [checker    :as checker]
                     [generator  :as gen]
                     [tests :as tests]]
-            [knossos [linear :as linear]
-                     [model :as model]]))
+            [jepsen.dyntables.memo :as memo]
+            [jepsen.dyntables.checker-middleware :as middleware]
+            [knossos [model :as model]]))
 
 (defn set-process
   ([history]
@@ -52,11 +53,11 @@
   [list]
   (run! println list))
 
-;; just make sure that history generators don't thorow exceptions
+;; just ensure that history generators don't throw exceptions
 (deftest one-line-history-test
   (run! (fn [hist] (-> hist
-                       yt/terminate-markers
                        yt/foldup-locks
+                       yt/complete-history
                        pretty-print)
                    (println))
        [one-line-success
@@ -66,12 +67,23 @@
 (defmacro test-line
   [history]
   `(->> ~history
-        yt/terminate-markers
         yt/foldup-locks
         (linear/analysis yt/empty-locked-dict)))
 
-(deftest checker-test
-  (is (:valid? (test-line one-line-success)))
-  (is (:valid? (test-line one-line-read-failure)))
-  (is (:valid? (test-line one-line-write-failure))))
+(deftest memo-test
+  (run! (fn [hist] (let [m (->> hist
+                                yt/foldup-locks
+                                yt/complete-history
+                                (memo/memo yt/empty-locked-dict))]
+                     (middleware/dump-logs! 
+                       (:history m)
+                       (:edges m))))
+       [one-line-success
+        one-line-read-failure
+        one-line-write-failure]))
+
+;(deftest checker-test
+;  (is (:valid? (test-line one-line-success)))
+;  (is (:valid? (test-line one-line-read-failure)))
+;  (is (:valid? (test-line one-line-write-failure))))
 

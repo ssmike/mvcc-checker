@@ -16,7 +16,7 @@
                     [tests      :as tests]
                     [util       :refer [timeout]]
                     [yt         :as yt]
-                    [yt_models  :as models]]))
+                    [yt-models  :as models]]))
 
 (def db
   (reify db/DB
@@ -76,7 +76,7 @@
                 :model   models/empty-locked-dict
                 :checker (checker/compose
                            {:perf   (checker/perf)
-                            :linear models/snapshot-serializable})
+                            :mvcc   models/snapshot-serializable})
                 :ssh {:username "root",
                       :strict-host-key-checking false,
                       :private-key-path "~/.ssh/yt"}})]
