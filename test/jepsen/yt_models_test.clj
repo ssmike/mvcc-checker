@@ -7,6 +7,7 @@
                     [tests :as tests]]
             [jepsen.dyntables.memo :as memo]
             [jepsen.dyntables.checker-middleware :as middleware]
+            [jepsen.dyntables.wgl :as wgl]
             [knossos [model :as model]]))
 
 (defn set-process
@@ -75,9 +76,11 @@
                                 yt/foldup-locks
                                 yt/complete-history
                                 (memo/memo yt/empty-locked-dict))]
-                     (middleware/dump-logs! 
-                       (:history m)
-                       (:edges m))))
+                     (is (:valid?
+                           (wgl/check
+                             (:init m)
+                             (:history m)
+                             (:edges m))))))
        [one-line-success
         one-line-read-failure
         one-line-write-failure]))
