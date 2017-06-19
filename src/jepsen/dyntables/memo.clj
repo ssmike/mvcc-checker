@@ -53,7 +53,8 @@
         transition-index (into {} (map-indexed swap transitions))]
     (info models)
     (info transitions)
-    {:transitions transitions
+    {:init (model-index init)
+     :transitions transitions
      :models models
      :history (preprocess-history history transition-index)
      :edges (vec (for [source models

@@ -9,7 +9,8 @@
                     [checker :as checker]]
             [knossos.model :as model]
             [jepsen.dyntables.memo :as memo]
-            [jepsen.dyntables.checker-middleware :as middleware])
+            [jepsen.dyntables.checker-middleware :as middleware]
+            [jepsen.dyntables.wgl :as wgl])
   (:import (knossos.model Model)))
 
 (def inconsistent model/inconsistent)
@@ -119,10 +120,10 @@
                         foldup-locks
                         complete-history)
             memo (memo/memo model history)
-            ;res (middleware/run-checker! (:history memo)
-            ;                          (:transitions memo))
-            res (middleware/dump-logs! (:history memo)
-                                       (:transitions memo))]
+            res (wgl/check
+                  (:init memo)
+                  (:history memo)
+                  (:transitions memo))]
         (with-open [w (io/writer "jepsen-op-log")]
           (doseq [h orig-history]
             (.write w (str h "\n"))))
