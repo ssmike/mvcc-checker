@@ -1,7 +1,7 @@
 (ns jepsen.dyntables.memo
   "Here we build transitions graph for use in heavy C++ checker"
   (:require [knossos.model :as model]
-            [clojure.tools.logging :refer [info warn error]])
+            [clojure.tools.logging :refer [info debug]])
   (:import (knossos.model Model)))
 
 (defn op->transition
@@ -53,8 +53,9 @@
         swap (fn [i op] [op i])
         model-index (into {} (map-indexed swap models))
         transition-index (into {} (map-indexed swap transitions))]
-    (info models)
-    (info transitions)
+    (debug models)
+    (debug transitions)
+    (info "memoizing model")
     {:init (model-index init)
      :transitions transitions
      :models models

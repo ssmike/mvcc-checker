@@ -1,6 +1,6 @@
 (ns jepsen.dyntables.wgl
   (:require [jepsen.dyntables.util :as util]
-            [clojure.tools.logging :refer [error info debug]])
+            [clojure.tools.logging :refer [debug info]])
   (:import [java.util BitSet]
            [java.util LinkedList]))
 
@@ -67,6 +67,7 @@
      ~history
      (loop [acc# (list)
             col# (seq ~history)]
+       (assert (seq col#))
        (let [item# (first col#)]
          (if (= (:index item#) ~index)
            (into (rest col#) acc#)
@@ -138,11 +139,8 @@
         ; just don't know how to properly create two-dimensional array of ints
         index (into-array (for [_ (range models)]
                             (int-array transitions -1)))]
+    (debug history)
     (doseq [[u t v] edges]
       (aset (aget index u) t v))
-    (debug index)
-    (doseq [item history]
-      (debug item))
-    (doseq [item (make-sequential history)]
-      (debug item))
+    (info "starting wgl")
     (explore index (make-sequential history) init)))

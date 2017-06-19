@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.util)
+(ns jepsen.dyntables.util) 
 
 (defn transitions-count
   [edges]
