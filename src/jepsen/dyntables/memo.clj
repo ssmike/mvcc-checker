@@ -38,8 +38,10 @@
   [history transition-index]
   (mapv (fn [ops]
           (let [op (first ops)
-                transitions (map op->transition ops)]
+                transitions (map op->transition ops)
+                blocks (map (comp boolean :blocks) ops)]
             {:value (mapv transition-index transitions)
+             :blocks (vec blocks)
              :type (:type op)
              :process (:process op)}))
         history))

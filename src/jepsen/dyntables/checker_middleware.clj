@@ -4,17 +4,18 @@
 
 (defn str-history
   [history]
-  (concat
-    [(count history)]
+  (cons
+    (count history)
     (for [h history]
-      (str " " ({:invoke 0 :ok 1} (:type h))
-           " " (:process h)
-           " " (:value h)))))
+      [(str " " ({:invoke 0 :ok 1} (:type h))
+            " " (:process h))
+       (:value h)
+       (:blocks h)])))
 
 (defn str-edges
   [edges]
-  (concat
-    [(count edges)]
+  (cons
+    (count edges)
     (map str edges)))
 
 (defn format-lines

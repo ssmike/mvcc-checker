@@ -1,6 +1,6 @@
 (ns jepsen.dyntables.wgl
   (:require [jepsen.dyntables.util :as util]
-            [clojure.tools.logging :refer [error debug debug]])
+            [clojure.tools.logging :refer [error info debug]])
   (:import [java.util BitSet]
            [java.util LinkedList]))
 
@@ -14,13 +14,27 @@
       (let [n (count res)]
         (if (= :invoke (:type op))
           (do
+            ; fill locks
+            (when-let [saved (cache (:process op))]
+              (let [old-item (res saved)
+                    _ (debug "old item" old-item)
+                    _ (debug "blocks" (:blocks op))
+                    new-value (mapv (fn [v block]
+                                      (if block (assoc v 1 n) v))
+                                    (:value old-item)
+                                    (:blocks old-item))
+                    _ (debug "new item" new-value)]
+                (assoc! res saved (assoc old-item :value new-value))))
+            ; conj :invoke op
+            (debug "op value" (:value op))
+            (debug "conj value" (mapv (fn[x] [x -1]) (:value op)))
             (conj! res {:index n
-                        :value (:value op)
+                        :value (mapv (fn[x] [x -1]) (:value op))
                         :max-index infinity})
             (assoc! cache (:process op) n))
           (let [saved (cache (:process op))
                 old-item (res saved)
-                new-item (assoc old-item :max-index n)]
+                new-item (assoc old-item :max-index (- n 1))]
             (assoc! res saved new-item)))))
     (->> res
          persistent!
@@ -46,6 +60,18 @@
          (if (:valid? op#)
            op#
            (recur (next col#)))))))
+
+(defmacro remove-index
+  [history index]
+  `(if (= ~index -1)
+     ~history
+     (loop [acc# (list)
+            col# (seq ~history)]
+       (let [item# (first col#)]
+         (if (= (:index item#) ~index)
+           (into (rest col#) acc#)
+           (recur (conj acc# item#)
+                  (rest col#)))))))
 
 (defn explore
   ([G history state]
@@ -73,22 +99,24 @@
 
        ; we have already been here
        ; this check makes sense only if we are at first history item
-       (let [_ (debug "looking up in cache")
-             item (MemoizationItem. state linearized)
-             seen (and (empty? skipped)
-                       (cache item))
-             _ (conj! cache item)
-             _ (debug "not found in cache")]
-         seen)
+       (and (empty? skipped)
+            (let [_ (debug "looking up in cache")
+                  item (MemoizationItem. state linearized)
+                  seen (cache item)
+                  _ (debug "not found in cache")]
+              (conj! cache item)
+              seen))
        {:valid? false}
 
        ;; try to linearize op
        :else
        (let [lin (merge-results
-                    (for [t (:value op)
+                    (for [[t to-delete] (:value op)
                           :let [v (aget G state t)]
                           :when (not= v -1)]
                       (let [_ (debug "linearizing" op)
+                            _ (debug "removing" to-delete "from" tail)
+                            tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op))]
                         (explore cache linearized G '() history v max-index))))
@@ -111,4 +139,8 @@
     (doseq [[u t v] edges]
       (aset (aget index u) t v))
     (debug index)
+    (doseq [item history]
+      (debug item))
+    (doseq [item (make-sequential history)]
+      (debug item))
     (explore index (make-sequential history) init)))
