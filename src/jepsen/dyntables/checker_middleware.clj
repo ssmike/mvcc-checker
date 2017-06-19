@@ -1,5 +1,6 @@
 (ns jepsen.dyntables.checker-middleware
-  (:require [clojure.java.shell :as sh]))
+  (:require [clojure.java.shell :as sh]
+            [jepsen.dyntables.util :as util]))
 
 (defn str-history
   [history]
@@ -23,37 +24,24 @@
       (. builder append (str line "\n")))
     (str builder)))
 
-(defn transitions-count
-  [edges]
-  (->> edges
-      (map second)
-      distinct
-      count))
-
-(defn models-count
-  [edges]
-  (->> edges
-       (mapcat (fn [it] [(it 0) (it 2)]))
-       distinct
-       count))
-
 (defn make-stdin
-  [history edges]
-  (format-lines (concat [(str (models-count edges) " "
-                              (transitions-count edges))]
+  [init history edges]
+  (format-lines (concat [(str init)
+                         (str (util/models-count edges) " "
+                              (util/transitions-count edges))]
                         (str-edges edges)
                         (str-history history))))
 
 (defn dump-logs!
-  [history edges]
+  [init history edges]
   (do
     (spit "jepsen-checker-log"
-          (make-stdin history edges))
+          (make-stdin init history edges))
     {:valid? true}))
 
 (defn run-checker!
-  [history edges]
-  (let [in (make-stdin history edges)
+  [init history edges]
+  (let [in (make-stdin init history edges)
         res (sh/sh "checker" :in in)]
     {:valid? (= 0 (:exit res))
      :diags (:out res)}))
