@@ -73,19 +73,21 @@
            (recur (conj acc# item#)
                   (rest col#)))))))
 
+(def ^:dynamic *lin-cache*)
+
 (defn explore
   ([G history state]
    (let [n (->> history (map :index) distinct count)]
-     (explore (transient #{})
-              (empty-linearized n)
-              G
-              '()
-              (into (list {:index infinity
-                           :max-index infinity})
-                    history)
-              state
-              infinity)))
-  ([cache linearized G skipped history state max-index]
+     (binding [*lin-cache* (transient #{})]
+       (explore (empty-linearized n)
+                G
+                '()
+                (into (list {:index infinity
+                             :max-index infinity})
+                      history)
+                state
+                infinity))))
+  ([linearized G skipped history state max-index]
    (let [op (first history)
          tail (rest history) ]
      (debug "calling explore" state)
@@ -102,9 +104,9 @@
        (and (empty? skipped)
             (let [_ (debug "looking up in cache")
                   item (MemoizationItem. state linearized)
-                  seen (cache item)
+                  seen (*lin-cache* item)
                   _ (debug "not found in cache")]
-              (conj! cache item)
+              (conj! *lin-cache* item)
               seen))
        {:valid? false}
 
@@ -119,7 +121,7 @@
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op))]
-                        (explore cache linearized G '() history v max-index))))
+                        (explore linearized G '() history v max-index))))
              _ (debug "results merged")]
           (if (:valid? lin)
             lin
@@ -127,7 +129,7 @@
             (let [_ (debug "skipping")
                   skipped (conj skipped op)
                   max-index (max max-index (:max-index op))]
-              (recur cache linearized G skipped tail state max-index))))))))
+              (recur linearized G skipped tail state max-index))))))))
 
 (defn check
   [init history edges]
