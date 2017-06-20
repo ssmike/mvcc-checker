@@ -1,16 +1,16 @@
 (ns jepsen.yt-models
-  (:gen-class)
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
-            [clojure.tools.logging :refer [info warn error]]
+            [clojure.tools.logging :refer [info warn error debug]]
             [jepsen [util :as util]
                     [generator :as gen]
                     [store :as store]
                     [checker :as checker]]
-            [knossos.model :as model]
             [jepsen.dyntables.memo :as memo]
             [jepsen.dyntables.checker-middleware :as middleware]
-            [jepsen.dyntables.wgl :as wgl])
+            [jepsen.dyntables.wgl :as wgl]
+            [jepsen.dyntables.history :refer [foldup-locks complete-history]]
+            [knossos.model :as model])
   (:import (knossos.model Model)))
 
 (def inconsistent model/inconsistent)
@@ -61,58 +61,6 @@
                                      2 1}
                                     #{}))
 
-(defn foldup-locks
-  [history]
-  (let [last-write (transient {})
-        new-history (transient [])]
-    (run! (fn [op]
-            (if (and (not= (:type op) :invoke)
-                     (= (:f op) :write-and-unlock))
-              (assoc! last-write (:process op) op))
-            (conj! new-history
-                (let [op-val (:value op)
-                      write-op (last-write (:process op))]
-                    (if (and (= (:f op) :read-and-lock)
-                             (not (nil? write-op))
-                             (not= (:type write-op) :fail))
-                      (let [locked (assoc op :value (conj op-val
-                                                     ;; we are locking written cell
-                                                     ((:value write-op) 0)))
-                            unlocked (assoc op :blocks true)]
-                        (if (= (:type write-op) :ok)
-                          [locked]
-                          [unlocked locked]))
-                      [op]))))
-          (reverse history))
-    (-> new-history
-        persistent!
-        reverse)))
-
-(defn merge-success
-  [invoke-ops ok-ops]
-  (mapv (fn [invoke-op ok-op]
-          (assoc invoke-op :value (:value ok-op))) invoke-ops ok-ops))
-
-(defn complete-history
-  [history]
-  (let [cache (transient {})
-        new-history (transient [])]
-    (doseq [op (reverse history)]
-      (let [p (:process op)]
-        (case (-> op first :type)
-          :ok (do
-                (assoc! cache p op)
-                (conj! new-history op))
-          :fail (assoc! cache p :fail)
-          :info (assoc! cache p op)
-          :invoke (if (not= (cache p) :fail)
-                    (conj! new-history
-                           (merge-success op
-                                          (cache p)))))))
-    (-> new-history
-        persistent!
-        reverse)))
-
 (def snapshot-serializable
   (reify checker/Checker
     (check [this test model orig-history opts]
@@ -120,10 +68,11 @@
                         foldup-locks
                         complete-history)
             memo (memo/memo model history)
+            _ (spit "checker-test.log" (str orig-history))
             res (wgl/check
                   (:init memo)
                   (:history memo)
-                  (:transitions memo))]
+                  (:edges memo))]
         (with-open [w (io/writer "jepsen-op-log")]
           (doseq [h orig-history]
             (.write w (str h "\n"))))

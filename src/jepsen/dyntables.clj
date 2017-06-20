@@ -47,7 +47,7 @@
           (info "yt proxy set up")
           (client sock)))
     (invoke! [this test op]
-      (timeout 5000 (assoc op :type :info, :error :timeout)
+      (timeout 6500 (assoc op :type :info, :error :timeout)
         (merge op (yt/ysend con op))))
     (teardown! [_ test] (yt/close con))))
 

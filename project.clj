@@ -5,7 +5,9 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [jepsen "0.1.6-SNAPSHOT"]
-                 [org.clojure/data.json "0.2.6"]]
+                 [org.clojure/data.json "0.2.6"]
+                 [spootnik/unilog "0.7.13"]
+                 [org.clojure/core.match "0.3.0-alpha4"]]
   :main jepsen.dyntables
   :target-path "target/%s"
   :jvm-opts ["-Xmx50g"
@@ -19,4 +21,5 @@
              "-XX:+UnlockCommercialFeatures"
 ;             "-XX:-OmitStackTraceInFastThrow"
              "-server"]
+  :omit-source true
   :profiles {:uberjar {:aot :all}})

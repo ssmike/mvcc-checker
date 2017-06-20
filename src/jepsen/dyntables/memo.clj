@@ -53,8 +53,6 @@
         swap (fn [i op] [op i])
         model-index (into {} (map-indexed swap models))
         transition-index (into {} (map-indexed swap transitions))]
-    (debug models)
-    (debug transitions)
     (info "memoizing model")
     {:init (model-index init)
      :transitions transitions

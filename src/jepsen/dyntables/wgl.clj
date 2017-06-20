@@ -1,45 +1,9 @@
 (ns jepsen.dyntables.wgl
-  (:require [jepsen.dyntables.util :as util]
+  (:require [jepsen.dyntables.util :refer :all]
+            [jepsen.dyntables.history :refer [make-sequential]]
             [clojure.tools.logging :refer [debug info]])
   (:import [java.util BitSet]
            [java.util LinkedList]))
-
-(def infinity 1e9)
-
-(defn make-sequential
-  [history]
-  (let [cache (transient {})
-        res (transient [])]
-    (doseq [op history]
-      (let [n (count res)]
-        (if (= :invoke (:type op))
-          (do
-            ; fill locks
-            (when-let [saved (cache (:process op))]
-              (let [old-item (res saved)
-                    _ (debug "old item" old-item)
-                    _ (debug "blocks" (:blocks op))
-                    new-value (mapv (fn [v block]
-                                      (if block (assoc v 1 n) v))
-                                    (:value old-item)
-                                    (:blocks old-item))
-                    _ (debug "new item" new-value)]
-                (assoc! res saved (assoc old-item :value new-value))))
-            ; conj :invoke op
-            (debug "op value" (:value op))
-            (debug "conj value" (mapv (fn[x] [x -1]) (:value op)))
-            (conj! res {:index n
-                        :value (mapv (fn[x] [x -1]) (:value op))
-                        :max-index infinity})
-            (assoc! cache (:process op) n))
-          (let [saved (cache (:process op))
-                old-item (res saved)
-                new-item (assoc old-item :max-index (- n 1))]
-            (assoc! res saved new-item)))))
-    (->> res
-         persistent!
-         reverse
-         (into '()))))
 
 (defrecord MemoizationItem [^int model ^BitSet linearized])
 
@@ -79,13 +43,14 @@
 (defn explore
   ([G history state]
    (let [n (->> history (map :index) distinct count)]
+     (debug "history to explore" history)
      (binding [*lin-cache* (transient #{})]
        (explore (empty-linearized n)
                 G
                 '()
                 (into (list {:index infinity
                              :max-index infinity})
-                      history)
+                      (reverse history))
                 state
                 infinity))))
   ([linearized G skipped history state max-index]
@@ -129,17 +94,16 @@
             ; just skip
             (let [_ (debug "skipping")
                   skipped (conj skipped op)
-                  max-index (max max-index (:max-index op))]
+                  max-index (min max-index (:max-index op))]
               (recur linearized G skipped tail state max-index))))))))
 
 (defn check
   [init history edges]
-  (let [models (util/models-count edges)
-        transitions (util/transitions-count edges)
+  (let [models (models-count edges)
+        transitions (transitions-count edges)
         ; just don't know how to properly create two-dimensional array of ints
         index (into-array (for [_ (range models)]
                             (int-array transitions -1)))]
-    (debug history)
     (doseq [[u t v] edges]
       (aset (aget index u) t v))
     (info "starting wgl")

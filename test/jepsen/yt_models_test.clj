@@ -8,7 +8,9 @@
             [jepsen.dyntables.memo :as memo]
             [jepsen.dyntables.checker-middleware :as middleware]
             [jepsen.dyntables.wgl :as wgl]
-            [knossos [model :as model]]))
+            [jepsen.dyntables.history :refer :all]
+            [knossos [model :as model]]
+            [unilog.config :as unilog]))
 
 (defn set-process
   ([history]
@@ -57,8 +59,8 @@
 ;; just ensure that history generators don't throw exceptions
 (deftest one-line-history-test
   (run! (fn [hist] (-> hist
-                       yt/foldup-locks
-                       yt/complete-history
+                       foldup-locks
+                       complete-history
                        pretty-print)
                    (println))
        [one-line-success
@@ -68,13 +70,13 @@
 (defmacro test-line
   [history]
   `(->> ~history
-        yt/foldup-locks
+        foldup-locks
         (linear/analysis yt/empty-locked-dict)))
 
 (deftest memo-test
   (run! (fn [hist] (let [m (->> hist
-                                yt/foldup-locks
-                                yt/complete-history
+                                foldup-locks
+                                complete-history
                                 (memo/memo yt/empty-locked-dict))]
                      (is (:valid?
                            (wgl/check
@@ -85,8 +87,24 @@
         one-line-read-failure
         one-line-write-failure]))
 
-;(deftest checker-test
-;  (is (:valid? (test-line one-line-success)))
-;  (is (:valid? (test-line one-line-read-failure)))
-;  (is (:valid? (test-line one-line-write-failure))))
+(defn checkfile
+  [fname]
+  (let [history  (->> fname
+                      slurp
+                      read-string
+                      foldup-locks
+                      complete-history)
+        m (memo/memo yt/empty-locked-dict history)]
+    (wgl/check (:init m) (:history m) (:edges m))))
 
+(deftest check-logs
+  (if (.exists (java.io.File. "checker-test"))
+    (is (:valid?
+          (checkfile "checker-test")))
+    (error "file doesn't exist")))
+
+(defn without-debug[f]
+  (unilog/start-logging! {:console true :level "info"})
+  (f))
+
+;(use-fixtures :once without-debug)
