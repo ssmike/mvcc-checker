@@ -65,6 +65,12 @@
                                      1 1
                                      2 1}
                                     #{}))
+(defn -diagnostics
+  [orig-history diag-history]
+  (let [ids (into #{} diag-history)]
+    (->> orig-history
+         (filter (comp ids :req-id))
+         (take 20))))
 
 (def snapshot-serializable
   (reify checker/Checker
@@ -77,8 +83,14 @@
             res (wgl/check
                   (:init memo)
                   (:history memo)
-                  (:edges memo))]
+                  (:edges memo))
+            [diag-state diag-hist] (:best res)]
         (with-open [w (io/writer "jepsen-op-log")]
           (doseq [h orig-history]
             (.write w (str h "\n"))))
-        res))))
+        (if (:valid? res)
+          res
+          (assoc res :state ((:models memo) diag-state)
+                     :best (-diagnostics
+                             orig-history
+                             diag-hist)))))))
