@@ -68,7 +68,6 @@
 
 (defn make-sequential
   [history]
-  (do
     (reset! *id-index-mapping* (transient {}))
     (->>
       (let [cache (atom (transient {}))]
@@ -84,9 +83,7 @@
                                             (if block (assoc v 1 n) v))
                                           (:value old-item)
                                           (:blocks old-item))]
-                      (assoc! res saved (-> old-item
-                                            (assoc :value new-value)
-                                            (dissoc :blocks)))))
+                      (assoc! res saved (assoc old-item :value new-value))))
                   ; conj :invoke op
                   (swap! cache assoc! (:process op) n)
                   (swap! *id-index-mapping* assoc! n (:req-id op))
@@ -103,5 +100,6 @@
         history))
 
       persistent!
+      (map #(dissoc % :blocks))
       reverse
-      (into '()))))
+      (into '())))

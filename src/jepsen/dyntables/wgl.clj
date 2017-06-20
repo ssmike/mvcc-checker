@@ -69,22 +69,25 @@
   ([linearized G skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
-     (debug "calling explore" state)
-     (debug "first -- " op)
+     (debug (str "calling explore: first -- " op " max-index " max-index))
      (cond
        (empty? history)
        {:valid? true}
 
        (> (:index op) max-index)
-       {:valid? false}
+       (do
+         (debug "gave up because of max-index")
+         {:valid? false})
 
        ; we have already been here
        ; this check makes sense only if we are at first history item
        (and (empty? skipped)
             (let [_ (debug "looking up in cache")
                   item (MemoizationItem. state linearized)
-                  seen (*lin-cache* item)
-                  _ (debug "not found in cache")]
+                  seen (*lin-cache* item)]
+              (if seen
+                 (debug "already have been here")
+                 (debug "not found in cache"))
               (conj! *lin-cache* item)
               (swap! *best-found* update-found [lin-cnt [state history]])
               seen))
@@ -97,7 +100,6 @@
                           :let [v (aget G state t)]
                           :when (not= v -1)]
                       (let [_ (debug "linearizing" op)
-                            _ (debug "removing" to-delete "from" tail)
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op) to-delete)]
@@ -107,7 +109,7 @@
           (if (:valid? lin)
             lin
             ; just skip
-            (let [_ (debug "skipping")
+            (let [_ (debug "skipping" op)
                   skipped (conj skipped op)
                   max-index (min max-index (:max-index op))]
               (recur linearized G skipped tail state max-index lin-cnt))))))))
@@ -122,8 +124,6 @@
     (doseq [[u t v] edges]
       (aset (aget index u) t v))
     (info "starting wgl")
-    ;(doseq [i history]
-    ;  (info "history item" i))
     (let [mapping (atom (transient {}))
           result (binding [*id-index-mapping* mapping]
                    (explore index (make-sequential history) init))
