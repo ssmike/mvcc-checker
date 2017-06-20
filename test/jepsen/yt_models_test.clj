@@ -51,10 +51,11 @@
 (defn print-diag-hist
   [orig-history diag-history]
   (let [ids (into #{} diag-history)]
-    (apply str (map (fn [item]
-                      (str item " |\n"))
-                    (filter (comp ids :req-id)
-                            orig-history)))))
+    (->> orig-history
+         (filter (comp ids :req-id))
+         (map (fn [item] (str item " |\n")))
+         (take 20)
+         (apply str))))
 
 (defn test-line
   [orig-history]

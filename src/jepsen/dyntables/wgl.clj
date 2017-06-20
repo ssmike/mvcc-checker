@@ -128,6 +128,5 @@
           result (binding [*id-index-mapping* mapping]
                    (explore index (make-sequential history) init))
           [state hist] (:best result)
-          mapping (persistent! @mapping)
-          _ (info mapping)]
+          mapping (persistent! @mapping)]
       (assoc result :best [state (map (comp mapping :index) hist)]))))
