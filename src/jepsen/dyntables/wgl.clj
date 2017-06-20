@@ -10,9 +10,11 @@
 (defn empty-linearized[n] (BitSet. n))
 
 (defn to-linearized
-  [^BitSet set op]
+  [^BitSet set op to-block]
   (let [new-set ^BitSet (.clone set)]
     (.set new-set op)
+    (if (pos? to-block)
+      (.set new-set to-block))
     new-set))
 
 (defmacro merge-results
@@ -86,7 +88,7 @@
                             _ (debug "removing" to-delete "from" tail)
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
-                            linearized (to-linearized linearized (:index op))]
+                            linearized (to-linearized linearized (:index op) to-delete)]
                         (explore linearized G '() history v max-index))))
              _ (debug "results merged")]
           (if (:valid? lin)
