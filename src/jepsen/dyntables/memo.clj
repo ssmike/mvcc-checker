@@ -48,12 +48,12 @@
 
 (defn memo
   [init history]
-  (let [transitions (vec (all-transitions history))
+  (let [_ (info "memoizing model")
+        transitions (vec (all-transitions history))
         models (vec (all-models init history transitions))
         swap (fn [i op] [op i])
         model-index (into {} (map-indexed swap models))
         transition-index (into {} (map-indexed swap transitions))]
-    (info "memoizing model")
     {:init (model-index init)
      :transitions transitions
      :models models

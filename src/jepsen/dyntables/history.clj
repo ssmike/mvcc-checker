@@ -62,7 +62,6 @@
                       (filter vector?)
                       reverse)]
     (assert (empty? (persistent! @cache)))
-    ;(debug history)
     history))
 
 (defn make-sequential
@@ -85,7 +84,6 @@
                                           (assoc :value new-value)
                                           (dissoc :blocks)))))
                 ; conj :invoke op
-                (debug "invoking" (:process op) n)
                 (swap! cache assoc! (:process op) n)
                 (conj! res {:index n
                             :value (mapv (fn[x] [x -1]) (:value op))
