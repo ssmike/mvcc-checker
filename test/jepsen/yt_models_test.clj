@@ -13,19 +13,23 @@
             [unilog.config :as unilog]))
 
 (def ^:dynamic operation-cache)
+(def ^:dynamic req-id)
 
 (defmacro hist-gen
   [& body]
-  `(binding [operation-cache (atom (transient{}))]
+  `(binding [operation-cache (atom (transient{}))
+             req-id (atom 0)]
      (list ~@body)))
 
 (defn read-op[proc key val]
-  (let [op {:type :invoke :f :read-and-lock :value [key val] :process proc}]
+  (let [id (swap! req-id inc)
+        op {:type :invoke :f :read-and-lock :value [key val] :process proc :req-id id}]
     (swap! operation-cache assoc! proc op)
     (assoc op :value [key nil])))
 
 (defn write-op[proc key val]
-  (let [op {:type :invoke :f :write-and-unlock :value [key val] :process proc}]
+  (let [id (swap! req-id inc)
+        op {:type :invoke :f :write-and-unlock :value [key val] :process proc :req-id id}]
     (swap! operation-cache assoc! proc op)
     op))
 
@@ -44,17 +48,30 @@
     (swap! operation-cache dissoc! proc)
     (assoc op :type :ok)))
 
-(defmacro test-line
-  [history]
-  `(let [history# (->> ~history
-                       foldup-locks
-                       complete-history)
-         m# (memo/memo yt/empty-locked-dict history#)
-         result# (wgl/check
-                   (:init m#)
-                   (:history m#)
-                   (:edges m#))]
-     (is (:valid? result#) "according to checker history is invalid")))
+(defn print-diag-hist
+  [orig-history diag-history]
+  (let [ids (into #{} diag-history)]
+    (apply str (map (fn [item]
+                      (str item " |\n"))
+                    (filter (comp ids :req-id)
+                            orig-history)))))
+
+(defn test-line
+  [orig-history]
+  (let [history (->> orig-history
+                     foldup-locks
+                     complete-history)
+         m (memo/memo yt/empty-locked-dict history)
+         result (wgl/check
+                  (:init m)
+                  (:history m)
+                  (:edges m))
+         [diag-state diag-hist] (:best result)
+         message  (str "according to checker history is invalid\n"
+                       "state - " ((:models m) diag-state) "\n"
+                       (print-diag-hist orig-history diag-hist)
+                       "left " (count diag-hist) " entries out of " (count history) "\n")]
+     (is (:valid? result) message)))
 
 (defn one-line-success
   []

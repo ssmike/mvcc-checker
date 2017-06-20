@@ -5,7 +5,7 @@
 
 (defn encode
   [op]
-  (let [allowed-keys #{:f :value :req-id}]
+  (let [allowed-keys #{:f :value :rpc-id :req-id}]
     (json/write-str
       (conj {} (filter (fn [[x _]]
                          (contains? allowed-keys x))
@@ -16,23 +16,24 @@
   (let [mp (json/read-str msg)]
     (into {} (map (fn [[a b]] [(keyword a)
                                ((case a
-                                  ("value" "req-id" "ret")
+                                  ("value" "rpc-id" "req-id" "ret")
                                     identity
                                     keyword)
                                  b)])
                   mp))))
 
+
 (defn ysend
-  [{:keys [in cache req-cnt]} msg]
+  [{:keys [in cache rpc-cnt]} msg]
   (let [result (promise)
-        id (swap! req-cnt inc)]
+        id (swap! rpc-cnt inc)]
     (swap! cache (fn [mp] (assoc mp id result)))
     (binding [*out* in]
-      (println (encode (assoc msg :req-id id)))
+      (println (encode (assoc msg :rpc-id id)))
       (flush))
     (let [value @result]
       (swap! cache (fn [mp] (dissoc mp id)))
-      value)))
+      (dissoc value :rpc-id))))
 
 (defn close
   [{:keys [reader in] :as client}]
@@ -50,13 +51,12 @@
         worker (fn []
                 (binding [*in* out]
                   (loop []
-                    (let [{id :req-id :as msg} (decode (read-line))]
+                    (let [{id :rpc-id :as msg} (decode (read-line))]
                       (deliver (@cache id) msg))
                     (recur))))]
     {:in (io/writer (. proc getOutputStream))
      :cache cache
-     :req-cnt (atom 0)
-     :proxy-id cnt
+     :rpc-cnt (atom 0)
      :reader (future (worker))}))
 
 (def table-mounted

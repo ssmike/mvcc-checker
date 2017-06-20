@@ -43,7 +43,8 @@
             {:value (mapv transition-index transitions)
              :blocks (vec blocks)
              :type (:type op)
-             :process (:process op)}))
+             :process (:process op)
+             :req-id (:req-id op)}))
         history))
 
 (defn memo

@@ -19,21 +19,26 @@
 (defn gen-cell-val [] (rand-int max-cell-val))
 (defn gen-key [] (rand-int 3))
 
-(defrecord DynGenerator [writing-processes]
+(defrecord DynGenerator [writing-processes request-counter]
   gen/Generator
   (op [this test process]
     (merge {:type :invoke}
-      (if (contains? @writing-processes process)
-        (do
-          (swap! writing-processes disj process)
-          {:f :write-and-unlock :value [(gen-key) (gen-cell-val)]})
-        (do
-          (swap! writing-processes conj process)
-          {:f :read-and-lock :value [(gen-key) nil]})))))
+           (let [id (swap! request-counter inc)]
+             (if (contains? @writing-processes process)
+               (do
+                 (swap! writing-processes disj process)
+                 {:req-id id :f :write-and-unlock :value [(gen-key) (gen-cell-val)]})
+               (do
+                 (swap! writing-processes conj process)
+                 {:req-id id :f :read-and-lock :value [(gen-key) nil]}))))))
 
-(defn dyntables-gen [] (DynGenerator. (atom #{})))
+(defn dyntables-gen [] (DynGenerator. (atom #{})
+                                      (atom 0)))
 
 (defrecord LockedDict [dict locks]
+  java.lang.Object
+  (toString [_]
+    (str "internal dict " dict " locks " locks))
   Model
   (step [m op]
     (let [[key val lock] (:value op)]

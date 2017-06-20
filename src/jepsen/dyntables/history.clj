@@ -64,39 +64,44 @@
     (assert (empty? (persistent! @cache)))
     history))
 
+(def ^:dynamic *id-index-mapping* (atom nil))
+
 (defn make-sequential
   [history]
-  (->>
-    (let [cache (atom (transient {}))]
-      (reduce
-        (fn [res op]
-          (let [n (count res)]
-            (if (= :invoke (:type op))
-              (do
-                ; fill locks
-                (when-let [saved (@cache (:process op))]
-                  (let [old-item (res saved)
-                        new-value (mapv (fn [v block]
-                                          (if block (assoc v 1 n) v))
-                                        (:value old-item)
-                                        (:blocks old-item))]
-                    (assoc! res saved (-> old-item
-                                          (assoc :value new-value)
-                                          (dissoc :blocks)))))
-                ; conj :invoke op
-                (swap! cache assoc! (:process op) n)
-                (conj! res {:index n
-                            :value (mapv (fn[x] [x -1]) (:value op))
-                            :max-index infinity
-                            :blocks (:blocks op)}))
-              (let [saved (@cache (:process op))
-                    _ (assert (= (:type op) :ok) op)
-                    old-item (res saved)
-                    new-item (assoc old-item :max-index (- n 1))]
-                (assoc! res saved new-item)))))
-      (transient [])
-      history))
+  (do
+    (reset! *id-index-mapping* (transient {}))
+    (->>
+      (let [cache (atom (transient {}))]
+        (reduce
+          (fn [res op]
+            (let [n (count res)]
+              (if (= :invoke (:type op))
+                (do
+                  ; fill locks
+                  (when-let [saved (@cache (:process op))]
+                    (let [old-item (res saved)
+                          new-value (mapv (fn [v block]
+                                            (if block (assoc v 1 n) v))
+                                          (:value old-item)
+                                          (:blocks old-item))]
+                      (assoc! res saved (-> old-item
+                                            (assoc :value new-value)
+                                            (dissoc :blocks)))))
+                  ; conj :invoke op
+                  (swap! cache assoc! (:process op) n)
+                  (swap! *id-index-mapping* assoc! n (:req-id op))
+                  (conj! res {:index n
+                              :value (mapv (fn[x] [x -1]) (:value op))
+                              :max-index infinity
+                              :blocks (:blocks op)}))
+                (let [saved (@cache (:process op))
+                      _ (assert (= (:type op) :ok) op)
+                      old-item (res saved)
+                      new-item (assoc old-item :max-index (- n 1))]
+                  (assoc! res saved new-item)))))
+        (transient [])
+        history))
 
-    persistent!
-    reverse
-    (into '())))
+      persistent!
+      reverse
+      (into '()))))

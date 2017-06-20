@@ -1,6 +1,6 @@
 (ns jepsen.dyntables.wgl
   (:require [jepsen.dyntables.util :refer :all]
-            [jepsen.dyntables.history :refer [make-sequential]]
+            [jepsen.dyntables.history :refer [make-sequential *id-index-mapping*]]
             [clojure.tools.logging :refer [debug info]])
   (:import [java.util BitSet]
            [java.util LinkedList]))
@@ -42,20 +42,31 @@
 
 (def ^:dynamic *lin-cache*)
 
+(def ^:dynamic *best-found*)
+
+(defn update-found
+  [[cnt1 set1 :as item1] [cnt2 set2 :as item2]]
+  (if (> cnt1 cnt2)
+    item1
+    item2))
+
 (defn explore
   ([G history state]
    (let [n (->> history (map :index) distinct count)]
      (debug "history to explore" history)
-     (binding [*lin-cache* (transient #{})]
-       (explore (empty-linearized n)
-                G
-                '()
-                (into (list {:index infinity
-                             :max-index infinity})
-                      (reverse history))
-                state
-                infinity))))
-  ([linearized G skipped history state max-index]
+     (binding [*lin-cache* (transient #{})
+               *best-found* (atom [0 nil])]
+       (let [exp-res (explore (empty-linearized n)
+                              G
+                              '()
+                              (into (list {:index infinity
+                                           :max-index infinity})
+                                    (reverse history))
+                              state
+                              infinity
+                              0)]
+         (assoc exp-res :best (@*best-found* 1))))))
+  ([linearized G skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
      (debug "calling explore" state)
@@ -75,6 +86,7 @@
                   seen (*lin-cache* item)
                   _ (debug "not found in cache")]
               (conj! *lin-cache* item)
+              (swap! *best-found* update-found [lin-cnt [state history]])
               seen))
        {:valid? false}
 
@@ -89,15 +101,16 @@
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op) to-delete)]
-                        (explore linearized G '() history v max-index))))
+                        (explore linearized G '() history v max-index (+ 1 lin-cnt)))))
              _ (debug "results merged")]
+
           (if (:valid? lin)
             lin
             ; just skip
             (let [_ (debug "skipping")
                   skipped (conj skipped op)
                   max-index (min max-index (:max-index op))]
-              (recur linearized G skipped tail state max-index))))))))
+              (recur linearized G skipped tail state max-index lin-cnt))))))))
 
 (defn check
   [init history edges]
@@ -109,4 +122,12 @@
     (doseq [[u t v] edges]
       (aset (aget index u) t v))
     (info "starting wgl")
-    (explore index (make-sequential history) init)))
+    ;(doseq [i history]
+    ;  (info "history item" i))
+    (let [mapping (atom (transient {}))
+          result (binding [*id-index-mapping* mapping]
+                   (explore index (make-sequential history) init))
+          [state hist] (:best result)
+          mapping (persistent! @mapping)
+          _ (info mapping)]
+      (assoc result :best [state (map (comp mapping :index) hist)]))))
