@@ -10,7 +10,7 @@
                  [org.clojure/core.match "0.3.0-alpha4"]]
   :main jepsen.dyntables
   :target-path "target/%s"
-  :jvm-opts ["-Xmx50g"
+  :jvm-opts ["-Xmx10g"
              "-XX:+UseConcMarkSweepGC"
              "-XX:+UseParNewGC"
              "-XX:+CMSParallelRemarkEnabled"
