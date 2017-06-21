@@ -3,11 +3,12 @@
 (def infinity 1e9)
 
 (defn transitions-count
-  [edges]
-  (->> edges
-      (map second)
-      (apply max)
-      (+ 1)))
+  [history]
+  (->> history 
+       (map :value)
+       (apply concat)
+       (apply max)
+       (+ 1)))
 
 (defn models-count
   [edges]

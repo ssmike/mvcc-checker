@@ -21,11 +21,9 @@
   [results]
   `(loop [col# (seq ~results)]
      (if (empty? col#)
-       {:valid? false}
+       false
        (let [op# (first col#)]
-         (if (:valid? op#)
-           op#
-           (recur (next col#)))))))
+         (or op# (recur (next col#)))))))
 
 (defmacro remove-index
   [history index]
@@ -65,19 +63,19 @@
                               state
                               infinity
                               0)]
-         (assoc exp-res :best (@*best-found* 1))))))
+         {:valid? exp-res :best (@*best-found* 1)}))))
   ([linearized G skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
      (debug (str "calling explore: first -- " op " max-index " max-index))
      (cond
        (empty? history)
-       {:valid? true}
+       true
 
        (> (:index op) max-index)
        (do
          (debug "gave up because of max-index")
-         {:valid? false})
+         false)
 
        ; we have already been here
        ; this check makes sense only if we are at first history item
@@ -91,7 +89,7 @@
               (conj! *lin-cache* item)
               (swap! *best-found* update-found [lin-cnt [state history]])
               seen))
-       {:valid? false}
+       false
 
        ;; try to linearize op
        :else
@@ -103,21 +101,21 @@
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op) to-delete)]
-                        (explore linearized G '() history v max-index (+ 1 lin-cnt)))))
+                        (explore linearized G '() history v infinity (+ 1 lin-cnt)))))
              _ (debug "results merged")]
 
-          (if (:valid? lin)
-            lin
-            ; just skip
-            (let [_ (debug "skipping" op)
-                  skipped (conj skipped op)
-                  max-index (min max-index (:max-index op))]
-              (recur linearized G skipped tail state max-index lin-cnt))))))))
+          (or lin
+              (debug "failed to linearize")
+              ; just skip
+              (let [_ (debug "skipping" op)
+                    skipped (conj skipped op)
+                    max-index (min max-index (:max-index op))]
+                (recur linearized G skipped tail state max-index lin-cnt))))))))
 
 (defn check
   [init history edges]
   (let [models (models-count edges)
-        transitions (transitions-count edges)
+        transitions (transitions-count history)
         ; just don't know how to properly create two-dimensional array of ints
         index (into-array (for [_ (range models)]
                             (int-array transitions -1)))]
