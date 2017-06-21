@@ -51,7 +51,6 @@
 (defn explore
   ([G history state]
    (let [n (->> history (map :index) distinct count)]
-     (debug "history to explore" history)
      (binding [*lin-cache* (transient #{})
                *best-found* (atom [0 nil])]
        (let [exp-res (explore (empty-linearized n)
@@ -67,7 +66,8 @@
   ([linearized G skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
-     (debug (str "calling explore: first -- " op " max-index " max-index))
+     (debug (str "calling explore: first -- " op
+                 " max-index " max-index))
      (cond
        (empty? history)
        true
@@ -95,7 +95,9 @@
        :else
        (let [lin (merge-results
                     (for [[t to-delete] (:value op)
-                          :let [v (aget G state t)]
+                          :let [_ (debug (str "state " state " transition " t))
+                                _ (debug (str "value " (aget G state t)))
+                                v (aget G state t)]
                           :when (not= v -1)]
                       (let [_ (debug "linearizing" op)
                             tail (remove-index tail to-delete)
@@ -121,6 +123,7 @@
                             (int-array transitions -1)))]
     (doseq [[u t v] edges]
       (aset (aget index u) t v))
+    (debug "graph size" models "x" transitions)
     (info "starting wgl")
     (let [mapping (atom (transient {}))
           result (binding [*id-index-mapping* mapping]

@@ -76,6 +76,7 @@
             (let [n (count res)]
               (if (= :invoke (:type op))
                 (do
+
                   ; fill locks
                   (when-let [saved (@cache (:process op))]
                     (let [old-item (res saved)
@@ -84,6 +85,7 @@
                                           (:value old-item)
                                           (:blocks old-item))]
                       (assoc! res saved (assoc old-item :value new-value))))
+
                   ; conj :invoke op
                   (swap! cache assoc! (:process op) n)
                   (swap! *id-index-mapping* assoc! n (:req-id op))
@@ -91,6 +93,7 @@
                               :value (mapv (fn[x] [x -1]) (:value op))
                               :max-index infinity
                               :blocks (:blocks op)}))
+
                 (let [saved (@cache (:process op))
                       _ (assert (= (:type op) :ok) op)
                       old-item (res saved)

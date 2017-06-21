@@ -171,4 +171,9 @@
   (unilog/start-logging! {:console true :level "info"})
   (f))
 
-(use-fixtures :once without-debug)
+(defn to-file[f]
+  (unilog/start-logging! {:console false :level "debug"
+                          :file "debug.log"})
+  (f))
+
+(use-fixtures :once to-file)
