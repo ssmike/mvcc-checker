@@ -79,18 +79,16 @@
                         foldup-locks
                         complete-history)
             memo (memo/memo model history)
-            _ (spit "checker-test.log" (str orig-history))
+            _ (spit "checker-test.log" (str orig-history)) ; for yt-models-test/check-logs
+            _ (with-open [w (io/writer "jepsen-op-log")]
+                (doseq [h orig-history]
+                   (.write w (str h "\n"))))
             res (wgl/check
                   (:init memo)
                   (:history memo)
                   (:edges memo))
             [diag-state diag-hist] (:best res)]
-        (with-open [w (io/writer "jepsen-op-log")]
-          (doseq [h orig-history]
-            (.write w (str h "\n"))))
-        (if (:valid? res)
-          res
-          (assoc res :state ((:models memo) diag-state)
-                     :best (-diagnostics
-                             orig-history
-                             diag-hist)))))))
+        (assoc res :state ((:models memo) diag-state)
+                   :best (-diagnostics
+                           orig-history
+                           diag-hist))))))
