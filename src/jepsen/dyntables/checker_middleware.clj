@@ -1,48 +1,56 @@
 (ns jepsen.dyntables.checker-middleware
   (:require [clojure.java.shell :as sh]
-            [jepsen.dyntables.util :as util]))
+            [jepsen.dyntables.util :as util]
+            [jepsen.dyntables.history :refer [make-sequential *id-index-mapping*]]
+            [clojure.string :refer [join]]))
 
 (defn str-history
   [history]
   (cons
     (count history)
-    (for [h history]
-      [(str " " ({:invoke 0 :ok 1} (:type h))
-            " " (:process h))
-       (:value h)
-       (:blocks h)])))
+    (flatten
+      (for [h history]
+        [(join " "  [({:invoke 0 :ok 1} (:type h))
+                     (:index h)
+                     (:max-index h)])
+         (map first (:value h))
+         (map second (:value h))]))))
 
 (defn str-edges
   [edges]
   (cons
     (count edges)
-    (map str edges)))
+    (map (partial join " ") edges)))
 
 (defn format-lines
   [lines]
-  (let [builder (java.lang.StringBuilder. "")]
-    (doseq [line lines]
-      (. builder append (str line "\n")))
-    (str builder)))
+  (join "\n" lines))
 
 (defn make-stdin
   [init history edges]
-  (format-lines (concat [(str init)
-                         (str (util/models-count edges) " "
-                              (util/transitions-count edges))]
+  (format-lines (concat [init]
                         (str-edges edges)
                         (str-history history))))
 
 (defn dump-logs!
   [init history edges]
-  (do
-    (spit "jepsen-checker-log"
-          (make-stdin init history edges))
-    {:valid? true}))
+  (let [mapping (atom (transient {}))
+        seq-hist (binding [*id-index-mapping* mapping]
+                   (make-sequential history))
+        in (make-stdin init seq-hist edges)
+        _ (spit "external-checker-test.log" in)]
+    {:valid? true
+     :state 0
+     :best ()}))
 
 (defn run-checker!
   [init history edges]
-  (let [in (make-stdin init history edges)
-        res (sh/sh "checker" :in in)]
-    {:valid? (= 0 (:exit res))
-     :diags (:out res)}))
+  (let [mapping (atom (transient {}))
+        seq-hist (binding [*id-index-mapping* mapping]
+                   (make-sequential history))
+        in (make-stdin init seq-hist edges)
+        res ((comp read-string :out)
+              (sh/sh "checker" :in in))]
+    (merge {:valid? (= 0 (:exit res))
+            :state res
+            :best (map @mapping (:best res))})))
