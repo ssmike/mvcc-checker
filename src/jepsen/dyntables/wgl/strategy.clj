@@ -64,7 +64,7 @@
                                 (Thread/sleep 200)
                                 ()))))
 
-          granularity (* threads 3)
+          granularity (* threads 10)
 
           worker-fn (fn [cache]
                       (when-not @search-success
