@@ -42,8 +42,8 @@
 (defn explore
   ([G history state]
   (let [n (->> history (map :index) distinct count)
-        ctx (ctx/transient-ctx)
-        exp-res (strategy/with-strategy (strategy/depth-first)
+        ctx (ctx/concurrent-ctx 16)
+        exp-res (strategy/with-strategy (strategy/concurrent 16)
                   (explore ctx
                            G
                            (empty-linearized n)
@@ -54,7 +54,7 @@
                            state
                            infinity
                            0))]
-    (ctx/found! ctx [n [state history]])
+    (ctx/found! ctx [0 [state history]])
     (debug (str "best found " (ctx/best ctx)))
     {:valid? exp-res :best ((ctx/best ctx) 1)}))
 
@@ -85,10 +85,11 @@
                             _ (debug "looking up in cache")]
                         (if (ctx/seen? ctx item)
                           (debug "already have been here")
-                          (let [_ (ctx/found! ctx [lin-cnt [state history]])
-                                _ (debug "constructing history")
+                          (let [_ (debug "constructing history")
                                 tail (remove-index tail to-delete)
-                                history (into tail skipped)]
+                                history (into tail skipped)
+                                _ (debug "found " [(+ 1 lin-cnt) [v history]])
+                                _ (ctx/found! ctx [(+ 1 lin-cnt) [v history]])]
                             (strategy/cooperate
                               (explore ctx G linearized '() history v infinity (+ 1 lin-cnt))))))))
              _ (debug "results merged")]
