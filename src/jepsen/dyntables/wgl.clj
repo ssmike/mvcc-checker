@@ -1,9 +1,9 @@
 (ns jepsen.dyntables.wgl
   (:require [jepsen.dyntables.util :refer :all]
             [jepsen.dyntables.history :refer [make-sequential *id-index-mapping*]]
+            [jepsen.dyntables.wgl.context :as ctx]
             [clojure.tools.logging :refer [debug info]])
-  (:import [java.util BitSet]
-           [java.util LinkedList]))
+  (:import [java.util BitSet]))
 
 (defrecord MemoizationItem [^int model ^BitSet linearized])
 
@@ -38,39 +38,12 @@
            (recur (conj acc# item#)
                   (rest col#)))))))
 
-(defn update-found
-  [[cnt1 set1 :as item1] [cnt2 set2 :as item2]]
-  (if (> cnt1 cnt2)
-    item1
-    item2))
-
-(defprotocol IExplorationCtx
-  (to [_ v t])
-  (found! [_ item])
-  (best [_])
-  (seen?[_ item]))
-
-(defrecord TransientCtx[lin-cache best-found G]
-  IExplorationCtx
-  (to [_ v t] (aget G v t))
-  (found! [_ item]
-    (swap! best-found update-found item))
-  (best [_] @best-found)
-  (seen? [_ item] (if (not (@lin-cache item))
-                    (do
-                      (swap! lin-cache conj! item)
-                      false)
-                    true)))
-
-(defn transient-ctx[G] (TransientCtx. (atom (transient #{}))
-                                      (atom [0 nil])
-                                      G))
-
 (defn explore
   ([G history state]
   (let [n (->> history (map :index) distinct count)
-        ctx (transient-ctx G)
+        ctx (ctx/transient-ctx)
         exp-res (explore ctx
+                         G
                          (empty-linearized n)
                          '()
                          (into (list {:index infinity
@@ -79,8 +52,8 @@
                          state
                          infinity
                          0)]
-    {:valid? exp-res :best ((best ctx) 1)}))
-  ([ctx linearized skipped history state max-index lin-cnt]
+    {:valid? exp-res :best ((ctx/best ctx) 1)}))
+  ([ctx G linearized skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
      (debug (str "calling explore: first -- " op
@@ -99,11 +72,11 @@
        (and (empty? skipped)
             (let [_ (debug "looking up in cache")
                   item (MemoizationItem. state linearized)
-                  seen (seen? ctx item)]
+                  seen (ctx/seen? ctx item)]
               (if seen
                  (debug "already have been here")
                  (debug "not found in cache"))
-              (found! ctx [lin-cnt [state history]])
+              (ctx/found! ctx [lin-cnt [state history]])
               seen))
        false
 
@@ -112,13 +85,13 @@
        (let [lin (merge-results
                     (for [[t to-delete] (:value op)
                           :let [_ (debug (str "state " state " transition " t))
-                                v (to ctx state t)]
+                                v (aget G state t)]
                           :when (not= v -1)]
                       (let [_ (debug "linearizing" op)
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op) to-delete)]
-                        (explore ctx linearized '() history v infinity (+ 1 lin-cnt)))))
+                        (explore ctx G linearized '() history v infinity (+ 1 lin-cnt)))))
              _ (debug "results merged")]
 
           (or lin
@@ -127,7 +100,7 @@
               (let [_ (debug "skipping" op)
                     skipped (conj skipped op)
                     max-index (min max-index (:max-index op))]
-                (recur ctx linearized skipped tail state max-index lin-cnt))))))))
+                (recur ctx G linearized skipped tail state max-index lin-cnt))))))))
 
 (defn check
   [init history edges]
