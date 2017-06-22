@@ -38,32 +38,49 @@
            (recur (conj acc# item#)
                   (rest col#)))))))
 
-(def ^:dynamic *lin-cache*)
-
-(def ^:dynamic *best-found*)
-
 (defn update-found
   [[cnt1 set1 :as item1] [cnt2 set2 :as item2]]
   (if (> cnt1 cnt2)
     item1
     item2))
 
+(defprotocol IExplorationCtx
+  (to [_ v t])
+  (found! [_ item])
+  (best [_])
+  (seen?[_ item]))
+
+(defrecord TransientCtx[lin-cache best-found G]
+  IExplorationCtx
+  (to [_ v t] (aget G v t))
+  (found! [_ item]
+    (swap! best-found update-found item))
+  (best [_] @best-found)
+  (seen? [_ item] (if (not (@lin-cache item))
+                    (do
+                      (swap! lin-cache conj! item)
+                      false)
+                    true)))
+
+(defn transient-ctx[G] (TransientCtx. (atom (transient #{}))
+                                      (atom [0 nil])
+                                      G))
+
 (defn explore
   ([G history state]
-   (let [n (->> history (map :index) distinct count)]
-     (binding [*lin-cache* (transient #{})
-               *best-found* (atom [0 nil])]
-       (let [exp-res (explore (empty-linearized n)
-                              G
-                              '()
-                              (into (list {:index infinity
-                                           :max-index infinity})
-                                    (reverse history))
-                              state
-                              infinity
-                              0)]
-         {:valid? exp-res :best (@*best-found* 1)}))))
-  ([linearized G skipped history state max-index lin-cnt]
+  (let [n (->> history (map :index) distinct count)
+        ctx (transient-ctx G)
+        exp-res (explore ctx
+                         (empty-linearized n)
+                         '()
+                         (into (list {:index infinity
+                                      :max-index infinity})
+                               (reverse history))
+                         state
+                         infinity
+                         0)]
+    {:valid? exp-res :best ((best ctx) 1)}))
+  ([ctx linearized skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
      (debug (str "calling explore: first -- " op
@@ -82,12 +99,11 @@
        (and (empty? skipped)
             (let [_ (debug "looking up in cache")
                   item (MemoizationItem. state linearized)
-                  seen (*lin-cache* item)]
+                  seen (seen? ctx item)]
               (if seen
                  (debug "already have been here")
                  (debug "not found in cache"))
-              (conj! *lin-cache* item)
-              (swap! *best-found* update-found [lin-cnt [state history]])
+              (found! ctx [lin-cnt [state history]])
               seen))
        false
 
@@ -96,14 +112,13 @@
        (let [lin (merge-results
                     (for [[t to-delete] (:value op)
                           :let [_ (debug (str "state " state " transition " t))
-                                _ (debug (str "value " (aget G state t)))
-                                v (aget G state t)]
+                                v (to ctx state t)]
                           :when (not= v -1)]
                       (let [_ (debug "linearizing" op)
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op) to-delete)]
-                        (explore linearized G '() history v infinity (+ 1 lin-cnt)))))
+                        (explore ctx linearized '() history v infinity (+ 1 lin-cnt)))))
              _ (debug "results merged")]
 
           (or lin
@@ -112,7 +127,7 @@
               (let [_ (debug "skipping" op)
                     skipped (conj skipped op)
                     max-index (min max-index (:max-index op))]
-                (recur linearized G skipped tail state max-index lin-cnt))))))))
+                (recur ctx linearized skipped tail state max-index lin-cnt))))))))
 
 (defn check
   [init history edges]
