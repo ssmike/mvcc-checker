@@ -23,13 +23,13 @@
 
 (defn read-op[proc key val]
   (let [id (swap! req-id inc)
-        op {:type :invoke :f :read-and-lock :value [key val] :process proc :req-id id}]
+        op {:type :invoke :f :read-and-lock :value [[[key val]]] :process proc :req-id id}]
     (swap! operation-cache assoc! proc op)
-    (assoc op :value [key nil])))
+    (assoc op :value [[[key nil]]])))
 
 (defn write-op[proc key val]
   (let [id (swap! req-id inc)
-        op {:type :invoke :f :write-and-unlock :value [key val] :process proc :req-id id}]
+        op {:type :invoke :f :write-and-unlock :value [[[key val]]] :process proc :req-id id}]
     (swap! operation-cache assoc! proc op)
     op))
 
@@ -72,6 +72,8 @@
                        "state - " ((:models m) diag-state) "\n"
                        (print-diag-hist orig-history diag-hist)
                        "left " (count diag-hist) " entries out of " (count history) "\n")]
+    (doseq [item history]
+      (error item))
      (is (:valid? result) message)))
 
 (defn one-line-success

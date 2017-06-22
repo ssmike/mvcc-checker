@@ -9,16 +9,15 @@
     (->> (reverse history)
          (map (fn [op]
                 (do
-                  (let [op-val (:value op)
-                        write-op (@last-write (:process op))]
+                  (let [write-op (@last-write (:process op))]
                     (match [(:f op) (:type op)]
                            [:read-and-lock _]
                            (if (and write-op
                                     (not= (:type write-op) :fail))
                              (let [_ (assert (:value write-op) (str write-op op))
-                                   locked (assoc op :value (conj op-val
-                                                                 ;; we are locking written cell
-                                                                 ((:value write-op) 0)))
+                                   locked (assoc op :value (conj (:value op)
+                                                                 ;; we are locking written cells
+                                                                 (mapv first ((:value write-op) 0))))
                                    unlocked (assoc op :blocks true)]
                                (if (= (:type write-op) :ok)
                                  [locked]

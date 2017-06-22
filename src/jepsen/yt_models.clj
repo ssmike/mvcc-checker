@@ -16,8 +16,10 @@
 (def inconsistent model/inconsistent)
 
 (def max-cell-val 3)
+(def cells-count 5)
+
 (defn gen-cell-val [] (rand-int max-cell-val))
-(defn gen-key [] (rand-int 3))
+(defn gen-key [] (rand-int cells-count))
 
 (defrecord DynGenerator [writing-processes request-counter]
   gen/Generator
@@ -27,10 +29,12 @@
              (if (contains? @writing-processes process)
                (do
                  (swap! writing-processes disj process)
-                 {:req-id id :f :write-and-unlock :value [(gen-key) (gen-cell-val)]})
+                 {:req-id id :f :write-and-unlock :value [[[(gen-key) (gen-cell-val)]
+                                                           [(gen-key) (gen-cell-val)]]]})
                (do
                  (swap! writing-processes conj process)
-                 {:req-id id :f :read-and-lock :value [(gen-key) nil]}))))))
+                 {:req-id id :f :read-and-lock :value [[[(gen-key) nil]
+                                                        [(gen-key) nil]]]}))))))
 
 (defn dyntables-gen [] (DynGenerator. (atom #{})
                                       (atom 0)))
@@ -41,29 +45,27 @@
     (str "internal dict " dict " locks " locks))
   Model
   (step [m op]
-    (let [[key val lock] (:value op)]
+    (let [[kvs op-locks] (:value op)
+          op-locks (into #{} op-locks)]
       (case (:f op)
         :read-and-lock
           (cond
-            (locks lock)
-              (inconsistent (str "can't lock " lock))
-            (not= (dict key) val)
-              (inconsistent (str "can't read " val " from " key))
+            (not (empty (set/intersection op-locks locks)))
+              (inconsistent (str "can't lock " op-locks))
+            (not= (into dict kvs) dict)
+              (inconsistent (str "can't read " (vec kvs)))
             true
-              (let [new-locks (if (nil? lock)
-                                locks
-                                (conj locks lock))
-                    new-dict (assoc dict key val)]
+              (let [new-locks (set/union locks op-locks)
+                    new-dict (into dict kvs)]
                 (LockedDict. new-dict new-locks)))
         :write-and-unlock
-          (if (locks key)
-            (LockedDict. (assoc dict key val)
-                         (disj locks key))
-            (inconsistent (str "writing to unlocked " lock)))))))
+          (if (set/subset? op-locks locks)
+            (LockedDict. (into dict kvs)
+                         (set/difference locks op-locks))
+            (inconsistent (str "writing to unlocked " op-locks)))))))
 
-(def empty-locked-dict (LockedDict. {0 1
-                                     1 1
-                                     2 1}
+(def empty-locked-dict (LockedDict. (into {} (for [i (range cells-count)]
+                                               [i 1]))
                                     #{}))
 (defn -diagnostics
   [orig-history diag-history]
