@@ -1,7 +1,8 @@
 (ns jepsen.dyntables.wgl
-  (:require [jepsen.dyntables.util :refer :all]
-            [jepsen.dyntables.history :refer [make-sequential *id-index-mapping*]]
-            [jepsen.dyntables.wgl.context :as ctx]
+  (:require [jepsen.dyntables [util :refer :all]
+                              [history :refer [make-sequential *id-index-mapping*]]]
+            [jepsen.dyntables.wgl [context :as ctx]
+                                  [strategy :as strategy]]
             [clojure.tools.logging :refer [debug info]])
   (:import [java.util BitSet]))
 
@@ -42,16 +43,18 @@
   ([G history state]
   (let [n (->> history (map :index) distinct count)
         ctx (ctx/transient-ctx)
-        exp-res (explore ctx
-                         G
-                         (empty-linearized n)
-                         '()
-                         (into (list {:index infinity
-                                      :max-index infinity})
-                               (reverse history))
-                         state
-                         infinity
-                         0)]
+        exp-res (strategy/with-strategy (strategy/depth-first)
+                  (explore ctx
+                           G
+                           (empty-linearized n)
+                           '()
+                           (into (list {:index infinity
+                                        :max-index infinity})
+                                 (reverse history))
+                           state
+                           infinity
+                           0))]
+    (debug (str "best found " (ctx/best ctx)))
     {:valid? exp-res :best ((ctx/best ctx) 1)}))
   ([ctx G linearized skipped history state max-index lin-cnt]
    (let [op (first history)
@@ -91,7 +94,9 @@
                             tail (remove-index tail to-delete)
                             history (into tail skipped)
                             linearized (to-linearized linearized (:index op) to-delete)]
-                        (explore ctx G linearized '() history v infinity (+ 1 lin-cnt)))))
+                        (assert strategy/*current-strategy*)
+                        (strategy/cooperate
+                          (explore ctx G linearized '() history v infinity (+ 1 lin-cnt))))))
              _ (debug "results merged")]
 
           (or lin
