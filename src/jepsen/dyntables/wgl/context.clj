@@ -24,7 +24,7 @@
                     true)))
 
 (defn transient-ctx[] (TransientCtx. (atom (transient #{}))
-                                     (atom [0 nil])))
+                                     (atom [-1 nil])))
 
 (defrecord ConcurrentCtx[^ConcurrentHashMap lin-cache best-found]
   IExplorationCtx

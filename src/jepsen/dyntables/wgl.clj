@@ -54,8 +54,10 @@
                            state
                            infinity
                            0))]
+    (ctx/found! ctx [n [state history]])
     (debug (str "best found " (ctx/best ctx)))
     {:valid? exp-res :best ((ctx/best ctx) 1)}))
+
   ([ctx G linearized skipped history state max-index lin-cnt]
    (let [op (first history)
          tail (rest history) ]
@@ -70,19 +72,6 @@
          (debug "gave up because of max-index")
          false)
 
-       ; we have already been here
-       ; this check makes sense only if we are at first history item
-       (and (empty? skipped)
-            (let [_ (debug "looking up in cache")
-                  item (MemoizationItem. state linearized)
-                  seen (ctx/seen? ctx item)]
-              (if seen
-                 (debug "already have been here")
-                 (debug "not found in cache"))
-              (ctx/found! ctx [lin-cnt [state history]])
-              seen))
-       false
-
        ;; try to linearize op
        :else
        (let [lin (merge-results
@@ -91,12 +80,17 @@
                                 v (aget G state t)]
                           :when (not= v -1)]
                       (let [_ (debug "linearizing" op)
-                            tail (remove-index tail to-delete)
-                            history (into tail skipped)
-                            linearized (to-linearized linearized (:index op) to-delete)]
-                        (assert strategy/*current-strategy*)
-                        (strategy/cooperate
-                          (explore ctx G linearized '() history v infinity (+ 1 lin-cnt))))))
+                            linearized (to-linearized linearized (:index op) to-delete)
+                            item (MemoizationItem. v linearized)
+                            _ (debug "looking up in cache")]
+                        (if (ctx/seen? ctx item)
+                          (debug "already have been here")
+                          (let [_ (ctx/found! ctx [lin-cnt [state history]])
+                                _ (debug "constructing history")
+                                tail (remove-index tail to-delete)
+                                history (into tail skipped)]
+                            (strategy/cooperate
+                              (explore ctx G linearized '() history v infinity (+ 1 lin-cnt))))))))
              _ (debug "results merged")]
 
           (or lin
