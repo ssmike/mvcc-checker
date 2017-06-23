@@ -44,9 +44,10 @@
 
 (defn depth-first[] (DepthFirst. ()))
 
-(deftype Concurrent[threads local-cache]
+(deftype Concurrent[threads local-cache in-flight]
   IExecutionStrategy
   (schedule [_ fun]
+    (swap! in-flight inc)
     (swap! local-cache conj fun)
     nil)
 
@@ -67,10 +68,12 @@
           granularity (* threads 10)
 
           worker-fn (fn [cache]
-                      (when-not @search-success
+                      (when (and (not @search-success)
+                                 (> @in-flight 0))
                          (doseq [item (broadcaster)]
                            (debug "running item")
-                           (if @item (reset! search-success true)))
+                           (if @item (reset! search-success true))
+                           (swap! in-flight dec))
                          (doseq [batch (partition-all granularity (reverse @cache))]
                            (swap! queue (fn [[_ q]]
                                           (list nil (conj q batch)))))
@@ -80,7 +83,7 @@
           workers (for [_ (range threads)]
                     (future
                       (let [cache (atom ())]
-                        (binding [*current-strategy* (Concurrent. nil cache)]
+                        (binding [*current-strategy* (Concurrent. nil cache in-flight)]
                           (worker-fn cache)))))]
       (reset! queue (list nil (list @local-cache)))
       (reset! local-cache nil) ; to ensure that nobody touches parent context
@@ -90,7 +93,7 @@
       (run! deref workers)
       @search-success)))
 
-(defn concurrent[threads] (Concurrent. threads (atom ())))
+(defn concurrent[threads] (Concurrent. threads (atom ()) (atom 0)))
 
 (defn factory
   [opts]
