@@ -125,9 +125,9 @@
                 :generator (->> (models/dyntables-gen)
                                 (gen/stagger 0.2)
                                 (gen/nemesis
-                                  (gen/seq (cycle [(gen/sleep 4)
+                                  (gen/seq (cycle [(gen/sleep 1)
                                                    {:type :info, :f :start}
-                                                   (gen/sleep 4)
+                                                   (gen/sleep 2)
                                                    {:type :info, :f :stop}])))
                                 (gen/time-limit timeout))
                 :model   models/empty-locked-dict
