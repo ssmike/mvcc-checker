@@ -19,22 +19,25 @@
 (def cells-count 5)
 
 (defn gen-cell-val [] (rand-int max-cell-val))
-(defn gen-key [] (rand-int cells-count))
+(defn gen-key
+  ([] (rand-int cells-count))
+  ([k] (->> (range cells-count) shuffle (take k))))
 
 (defrecord DynGenerator [writing-processes request-counter]
   gen/Generator
   (op [this test process]
     (merge {:type :invoke}
-           (let [id (swap! request-counter inc)]
+           (let [id (swap! request-counter inc)
+                 [k1 k2] (gen-key 2)]
              (if (contains? @writing-processes process)
                (do
                  (swap! writing-processes disj process)
-                 {:req-id id :f :write-and-unlock :value [[[(gen-key) (gen-cell-val)]
-                                                           [(gen-key) (gen-cell-val)]]]})
+                 {:req-id id :f :write-and-unlock :value [[[k1 (gen-cell-val)]
+                                                           [k2 (gen-cell-val)]]]})
                (do
                  (swap! writing-processes conj process)
-                 {:req-id id :f :read-and-lock :value [[[(gen-key) nil]
-                                                        [(gen-key) nil]]]}))))))
+                 {:req-id id :f :read-and-lock :value [[[k1 nil]
+                                                        [k2 nil]]]}))))))
 
 (defn dyntables-gen [] (DynGenerator. (atom #{})
                                       (atom 0)))
