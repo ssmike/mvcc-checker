@@ -32,12 +32,14 @@
              (if (contains? @writing-processes process)
                (do
                  (swap! writing-processes disj process)
-                 {:req-id id :f :write-and-unlock :value [[[k1 (gen-cell-val)]
-                                                           [k2 (gen-cell-val)]]]})
+                 {:req-id id
+                  :f :write-and-unlock
+                  :value {k1 (gen-cell-val) k2 (gen-cell-val)}})
                (do
                  (swap! writing-processes conj process)
-                 {:req-id id :f :read-and-lock :value [[[k1 nil]
-                                                        [k2 nil]]]}))))))
+                 {:req-id id
+                  :f :read-and-lock
+                  :value {k1 nil k2 nil}}))))))
 
 (defn dyntables-gen [] (DynGenerator. (atom #{})
                                       (atom 0)))
@@ -48,8 +50,8 @@
     (str "internal dict " dict " locks " locks))
   Model
   (step [m op]
-    (let [[kvs op-locks] (:value op)
-          op-locks (into #{} op-locks)]
+    (let [kvs (:value op)
+          op-locks (or (:locks op) #{})]
       (case (:f op)
         :read-and-lock
           (cond

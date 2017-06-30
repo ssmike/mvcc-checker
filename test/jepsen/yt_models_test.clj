@@ -21,15 +21,17 @@
              req-id (atom 0)]
      (list ~@body)))
 
-(defn read-op[proc key val]
-  (let [id (swap! req-id inc)
-        op {:type :invoke :f :read-and-lock :value [[[key val]]] :process proc :req-id id}]
+(defn read-op[proc & kvs]
+  (let [kvs (->> kvs (partition-all 2) (map vec) (into {}))
+        id (swap! req-id inc)
+        op {:type :invoke :f :read-and-lock :value kvs :process proc :req-id id}]
     (swap! operation-cache assoc! proc op)
-    (assoc op :value [[[key nil]]])))
+    (assoc op :value (map (fn[[x _]] [x nil]) kvs))))
 
-(defn write-op[proc key val]
-  (let [id (swap! req-id inc)
-        op {:type :invoke :f :write-and-unlock :value [[[key val]]] :process proc :req-id id}]
+(defn write-op[proc & kvs]
+  (let [kvs (->> kvs (partition-all 2) (map vec) (into {}))
+        id (swap! req-id inc)
+        op {:type :invoke :f :write-and-unlock :value kvs :process proc :req-id id}]
     (swap! operation-cache assoc! proc op)
     op))
 

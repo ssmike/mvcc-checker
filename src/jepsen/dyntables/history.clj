@@ -15,9 +15,7 @@
                            (if (and write-op
                                     (not= (:type write-op) :fail))
                              (let [_ (assert (:value write-op) (str write-op op))
-                                   locked (assoc op :value (conj (:value op)
-                                                                 ;; we are locking written cells
-                                                                 (mapv first ((:value write-op) 0))))
+                                   locked (assoc op :locks (into #{} (keys (:value write-op))))
                                    unlocked (assoc op :blocks true)]
                                (if (= (:type write-op) :ok)
                                  [locked]
