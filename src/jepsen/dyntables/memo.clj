@@ -1,12 +1,11 @@
 (ns jepsen.dyntables.memo
-  "Here we build transitions graph for use in heavy C++ checker"
   (:require [knossos.model :as model]
             [clojure.tools.logging :refer [info debug]])
   (:import (knossos.model Model)))
 
 (defn op->transition
   [op]
-  (select-keys op #{:f :value}))
+  (select-keys op #{:f :value :locks}))
 
 (defn all-transitions
   [history]

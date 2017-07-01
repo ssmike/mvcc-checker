@@ -37,12 +37,14 @@
                                  [locked]
                                  [unlocked locked]))
                              [op])
-                           [:commit :invoke]
-                           [op]
                            [:commit _]
                            (do
-                             (swap! last-write assoc! (:process op) op)
-                             [op])
+                             (if (not= (:type op) :invoke)
+                               (swap! last-write assoc! (:process op) op))
+                             [(assoc op :locks (->> op
+                                                    :value
+                                                    keys
+                                                    (into #{})))])
                            :else nil)))))
          (filter vector?)
          reverse)))

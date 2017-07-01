@@ -49,7 +49,7 @@
     (swap! operation-cache dissoc! proc)
     (assoc op :type :ok)))
 
-(defn test-line
+(defn test-valid
   [orig-history]
   (let [result (checker/check
                  mvcc-checker/snapshot-serializable
@@ -65,6 +65,22 @@
                       "left " (count diag-hist) " entries out of " (count orig-history) "\n")]
      (is (:valid? result) message)))
 
+(defn test-invalid
+  [orig-history]
+  (let [result (checker/check
+                 mvcc-checker/snapshot-serializable
+                 {}
+                 yt/empty-locked-dict
+                 orig-history
+                 {})
+        diag-state (:state result)
+        diag-hist (:best result)
+        message  (str "according to checker history is valid\n"
+                      "state - " diag-state "\n"
+                      diag-hist
+                      "left " (count diag-hist) " entries out of " (count orig-history) "\n")]
+     (is (not (:valid? result)) message)))
+
 (defn one-line-success
   []
   (hist-gen
@@ -78,7 +94,7 @@
     (op-ok :1)))
 
 (deftest one-line-success-correctness
-  (test-line (one-line-success)))
+  (test-valid (one-line-success)))
 
 (defn one-line-read-failure
   []
@@ -93,7 +109,7 @@
     (op-fail :1)))
 
 (deftest one-line-read-failure-correctness
-  (test-line (one-line-read-failure)))
+  (test-valid (one-line-read-failure)))
 
 (defn one-line-write-failure
   []
@@ -108,7 +124,7 @@
     (op-hangs :1)))
 
 (deftest one-line-write-failure-correctness
-  (test-line (one-line-write-failure)))
+  (test-valid (one-line-write-failure)))
 
 (defn pretty-print
   [list]
@@ -127,7 +143,54 @@
     (op-fail :2)))
 
 (deftest unacknowledged-commit-test
-  (test-line (unacknowledged-commit)))
+  (test-valid (unacknowledged-commit)))
+
+(defn simple-concurrent-write
+  []
+  (hist-gen
+    (read-op :2 2 1)
+    (op-ok :2)
+    (read-op :1 0 1)
+    (op-ok :1)
+    (write-op :2 1 3)
+    (op-ok :2)
+    (write-op :1 1 2)
+    (op-ok :1)))
+
+(deftest simple-concurrent-write-test
+  (test-invalid (simple-concurrent-write)))
+
+(defn hanged-concurrent-write
+  []
+  (hist-gen
+    (read-op :2 2 1)
+    (op-ok :2)
+    (read-op :1 0 1)
+    (op-ok :1)
+    (write-op :2 1 3)
+    (op-hangs :2)
+    (write-op :1 1 2)
+    (op-ok :1)
+    (read-op :3 1 3)
+    (op-ok :3)))
+
+(deftest hanged-concurrent-write-test
+  (test-invalid (simple-concurrent-write)))
+
+(defn unserializable-valid
+  []
+  (hist-gen
+    (read-op :1 2 1)
+    (op-ok :1)
+    (read-op :2 1 1)
+    (op-ok :2)
+    (write-op :1 1 2)
+    (op-ok :1)
+    (write-op :2 2 3)
+    (op-ok :2)))
+
+(deftest unserializable-valid-test
+  (test-valid (unserializable-valid)))
 
 (defn timed-out-commit
   []
@@ -142,14 +205,14 @@
     (op-fail :2)))
 
 (deftest timed-out-commit-test
-  (test-line (timed-out-commit)))
+  (test-valid (timed-out-commit)))
 
 (defn checkfile
   [fname]
   (with-open [in (-> fname io/reader java.io.PushbackReader.)]
     (let [history (take-while identity
                               (repeatedly #(edn/read {:eof nil} in)))]
-      (test-line history))))
+      (test-valid history))))
 
 (deftest ^:fat check-logs
   (if (.exists (java.io.File. "checker-test"))
