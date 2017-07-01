@@ -11,7 +11,7 @@
                 (do
                   (let [write-op (@last-write (:process op))]
                     (match [(:f op) (:type op)]
-                           [:read-and-lock _]
+                           [:start-tx _]
                            (if (and write-op
                                     (not= (:type write-op) :fail))
                              (let [_ (assert (:value write-op) (str write-op op))
@@ -21,9 +21,9 @@
                                  [locked]
                                  [unlocked locked]))
                              [op])
-                           [:write-and-unlock :invoke]
+                           [:commit :invoke]
                            [op]
-                           [:write-and-unlock _]
+                           [:commit _]
                            (do
                              (swap! last-write assoc! (:process op) op)
                              [op])

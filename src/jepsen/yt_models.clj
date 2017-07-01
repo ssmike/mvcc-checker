@@ -33,12 +33,12 @@
                (do
                  (swap! writing-processes disj process)
                  {:req-id id
-                  :f :write-and-unlock
+                  :f :commit
                   :value {k1 (gen-cell-val) k2 (gen-cell-val)}})
                (do
                  (swap! writing-processes conj process)
                  {:req-id id
-                  :f :read-and-lock
+                  :f :start-tx
                   :value {k1 nil k2 nil}}))))))
 
 (defn dyntables-gen [] (DynGenerator. (atom #{})
@@ -53,7 +53,7 @@
     (let [kvs (:value op)
           op-locks (or (:locks op) #{})]
       (case (:f op)
-        :read-and-lock
+        :start-tx
           (cond
             (not (empty (set/intersection op-locks locks)))
               (inconsistent (str "can't lock " op-locks))
@@ -63,7 +63,7 @@
               (let [new-locks (set/union locks op-locks)
                     new-dict (into dict kvs)]
                 (LockedDict. new-dict new-locks)))
-        :write-and-unlock
+        :commit
           (if (set/subset? op-locks locks)
             (LockedDict. (into dict kvs)
                          (set/difference locks op-locks))
