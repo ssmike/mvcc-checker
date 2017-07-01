@@ -22,4 +22,6 @@
 ;             "-XX:-OmitStackTraceInFastThrow"
              "-server"]
   :omit-source true
+  :test-selectors {:default (complement :fat)
+                   :all (constantly true)}
   :profiles {:uberjar {:aot :all}})

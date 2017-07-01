@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.util
+(ns jepsen.dyntables.wgl.util
   (:require [clojure.tools.logging :refer [debug info warn]]))
 
 (def infinity 1e9)

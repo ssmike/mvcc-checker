@@ -1,16 +1,15 @@
-(ns jepsen.yt-models-test
-  (:require [clojure.test :refer :all]
+(ns jepsen.dyntables.checker-test
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
             [clojure.tools.logging :refer [info warn error]]
             [jepsen [yt-models :as yt]
                     [checker    :as checker]
                     [generator  :as gen]
                     [tests :as tests]]
-            [jepsen.dyntables.memo :as memo]
-            [jepsen.dyntables.checker-middleware :as middleware]
-            [jepsen.dyntables.wgl :as wgl]
-            [jepsen.dyntables.history :refer :all]
+            [jepsen.dyntables [checker :as mvcc-checker]]
             [knossos [model :as model]]
-            [unilog.config :as unilog]))
+            [unilog.config :as unilog]
+            [clojure.edn :as edn]))
 
 (def ^:dynamic operation-cache)
 (def ^:dynamic req-id)
@@ -50,32 +49,20 @@
     (swap! operation-cache dissoc! proc)
     (assoc op :type :ok)))
 
-(defn print-diag-hist
-  [orig-history diag-history]
-  (let [ids (into #{} diag-history)]
-    (->> orig-history
-         (filter (comp ids :req-id))
-         (map (fn [item] (str item " |\n")))
-         (take 20)
-         (apply str))))
-
 (defn test-line
   [orig-history]
-  (let [history (->> orig-history
-                     foldup-locks
-                     complete-history)
-         m (memo/memo yt/empty-locked-dict history)
-         result (wgl/check
-                  (:init m)
-                  (:history m)
-                  (:edges m))
-         [diag-state diag-hist] (:best result)
-         message  (str "according to checker history is invalid\n"
-                       "state - " ((:models m) diag-state) "\n"
-                       (print-diag-hist orig-history diag-hist)
-                       "left " (count diag-hist) " entries out of " (count history) "\n")]
-    (doseq [item history]
-      (error item))
+  (let [result (checker/check
+                 mvcc-checker/snapshot-serializable
+                 {}
+                 yt/empty-locked-dict
+                 orig-history
+                 {})
+        diag-state (:state result)
+        diag-hist (:best result)
+        message  (str "according to checker history is invalid\n"
+                      "state - " diag-state "\n"
+                      diag-hist
+                      "left " (count diag-hist) " entries out of " (count orig-history) "\n")]
      (is (:valid? result) message)))
 
 (defn one-line-success
@@ -159,12 +146,12 @@
 
 (defn checkfile
   [fname]
-  (let [history  (->> fname
-                      slurp
-                      read-string)]
-    (test-line history)))
+  (with-open [in (-> fname io/reader java.io.PushbackReader.)]
+    (let [history (take-while identity
+                              (repeatedly #(edn/read {:eof nil} in)))]
+      (test-line history))))
 
-(deftest check-logs
+(deftest ^:fat check-logs
   (if (.exists (java.io.File. "checker-test"))
     (checkfile "checker-test")
     (do

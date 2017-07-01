@@ -19,7 +19,8 @@
                     [net        :as net]
                     [yt         :as yt]
                     [yt-models  :as models]]
-            [org.httpkit.client :as http]))
+            [org.httpkit.client :as http]
+            [jepsen.dyntables.checker :as mvcc-checker]))
 
 (def db
   (reify db/DB
@@ -133,7 +134,7 @@
                 :model   models/empty-locked-dict
                 :checker (checker/compose
                            {:perf   (checker/perf)
-                            :mvcc   models/snapshot-serializable})
+                            :mvcc   mvcc-checker/snapshot-serializable})
                 :ssh {:username "root",
                       :strict-host-key-checking false,
                       :private-key-path "~/.ssh/yt"}})]

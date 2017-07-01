@@ -1,8 +1,8 @@
 (ns jepsen.dyntables.wgl
-  (:require [jepsen.dyntables [util :refer :all]
-                              [history :refer [make-sequential *id-index-mapping*]]]
-            [jepsen.dyntables.wgl [context :as ctx]
-                                  [strategy :as strategy]]
+  (:require [jepsen.dyntables.wgl [context :as ctx]
+                                  [strategy :as strategy]
+                                  [history :refer [make-sequential *id-index-mapping*]]
+                                  [util :refer :all]]
             [clojure.tools.logging :refer [debug info]])
   (:import [java.util BitSet]))
 
