@@ -1,5 +1,5 @@
 # dyntables
-![Build Status](https://travis-ci.org/ssmike/dyntables.svg?branch=master)
+![Build Status](https://travis-ci.org/ssmike/yt-kv.svg?branch=master)
 
 Dyntables stands for Dynamic Tables.
 It is [Yandex YT](https://events.yandex.ru/lib/talks/1091/) internal key-value storage which

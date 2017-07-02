@@ -1,4 +1,7 @@
 language: clojure
-script: lein test :all
+script:
+  - lein test :all
+  - lein eastwood
+  - lein kibit
 jdk:
   - oraclejdk8
