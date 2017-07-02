@@ -34,13 +34,14 @@
     nil)
   (execute! [_]
     (loop [stack current-call]
-      (let [[item & stack] stack
-            to-stop @item
-            to-insert current-call]
-        (debug (str "pushed " (count current-call) " calls"))
-        (set! current-call ())
-        (or to-stop
-            (recur (into stack to-insert)))))))
+      (if-not (empty? stack)
+        (let [[item & stack] stack
+              to-stop @item
+              to-insert current-call]
+          (debug (str "pushed " (count current-call) " calls"))
+          (set! current-call ())
+          (or to-stop
+              (recur (into stack to-insert))))))))
 
 (defn depth-first[] (DepthFirst. ()))
 
