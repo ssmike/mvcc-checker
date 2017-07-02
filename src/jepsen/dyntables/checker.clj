@@ -10,7 +10,7 @@
   ([orig-history diag-history num]
    (take num (-diagnostics orig-history diag-history)))
   ([orig-history diag-history]
-   (let [ids (into #{} diag-history)]
+   (let [ids (set diag-history)]
       (->> orig-history
            (filter (comp ids :req-id))
            (map #(dissoc % :req-id))))))

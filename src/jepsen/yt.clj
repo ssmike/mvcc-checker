@@ -1,7 +1,7 @@
 (ns jepsen.yt
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io])
-  [:import java.lang.Runtime])
+  (:import java.lang.Runtime))
 
 (defn encode
   [op]
@@ -45,9 +45,10 @@
 (defn start-client
   []
   (let [cnt (swap! proxy-num inc)
-        proc (. (Runtime/getRuntime) exec (into-array ["run-proxy.sh" (str cnt)]))
+        proc (.exec (Runtime/getRuntime)
+                (into-array ["run-proxy.sh" (str cnt)]))
         cache (atom {})
-        out (io/reader (. proc getInputStream))
+        out (io/reader (.getInputStream proc))
         worker (fn []
                 (binding [*in* out]
                   (loop []
@@ -69,7 +70,7 @@
         my-promise (promise)]
     (let [[im-first to-deliver]
           (dosync
-              (if (not @mounted)
+              (if-not @mounted
                 (do (ref-set mounted true)
                     (ref-set mount-result my-promise)
                  [true my-promise])

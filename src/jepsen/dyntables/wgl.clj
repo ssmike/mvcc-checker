@@ -88,10 +88,9 @@
                           (let [_ (debug "constructing history")
                                 tail (remove-index tail to-delete)
                                 history (into tail skipped)
-                                _ (debug "found " [(+ 1 lin-cnt) [v history]])
-                                _ (ctx/found! ctx [(+ 1 lin-cnt) [v history]])]
+                                _ (ctx/found! ctx [(inc lin-cnt) [v history]])]
                             (strategy/cooperate
-                              (explore ctx G linearized '() history v infinity (+ 1 lin-cnt))))))))
+                              (explore ctx G linearized '() history v infinity (inc lin-cnt))))))))
              _ (debug "results merged")]
 
           (or lin

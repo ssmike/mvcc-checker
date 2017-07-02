@@ -78,13 +78,20 @@
                      (do
                        ; guilty until proven innocent
                        (swap! statuses assoc node false)
-                       (http/get (str "http://" (name node) ":" monitor-port "/orchid/tablet_cells")
+                       (http/get (str "http://" (name node) ":"
+                                      monitor-port "/orchid/tablet_cells")
                                  {:timeout 1000}
                                  (fn [{:keys [status body error]}]
                                    (cond
-                                     error (debug (str "exception thrown while connecting to " node))
-                                     (not= status 200) (debug (str node " responded with " status))
-                                     (-> body json/read-str empty? not) (swap! statuses assoc node true)
+                                     error
+                                     (debug (str "exception thrown while connecting to " node))
+
+                                     (not= status 200)
+                                     (debug (str node " responded with " status))
+
+                                     (-> body json/read-str empty? not)
+                                     (swap! statuses assoc node true)
+
                                      ; do nothing
                                      :else ()))))))))]
 

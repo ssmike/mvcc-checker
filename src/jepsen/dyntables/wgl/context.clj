@@ -17,7 +17,7 @@
   (found! [_ item]
     (swap! best-found update-found item))
   (best [_] @best-found)
-  (seen? [_ item] (if (not (@lin-cache item))
+  (seen? [_ item] (if-not (@lin-cache item)
                     (do
                       (swap! lin-cache conj! item)
                       false)

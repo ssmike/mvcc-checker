@@ -70,28 +70,28 @@
 
           worker-fn (fn [cache]
                       (when (and (not @search-success)
-                                 (> @in-flight 0))
+                                 (pos? @in-flight))
                          (doseq [item (broadcaster)]
                            (debug "running item")
                            (if @item (reset! search-success true))
                            (swap! in-flight dec))
-                         (doseq [batch (partition-all granularity (reverse @cache))]
+                         (doseq [batch (partition-all granularity
+                                                      (reverse @cache))]
                            (swap! queue (fn [[_ q]]
                                           (list nil (conj q batch)))))
                          (reset! cache ())
-                         (recur cache)))
+                         (recur cache)))]
 
-          workers (for [_ (range threads)]
-                    (future
-                      (let [cache (atom ())]
-                        (binding [*current-strategy* (Concurrent. nil cache in-flight)]
-                          (worker-fn cache)))))]
       (reset! queue (list nil (list @local-cache)))
       (reset! local-cache nil) ; to ensure that nobody touches parent context
       (debug "running workers")
-      (doall workers)
-      ; join them
-      (run! deref workers)
+      (let [workers (doall (for [_ (range threads)]
+                             (future
+                               (let [cache (atom ())]
+                                 (binding [*current-strategy* (Concurrent. nil cache in-flight)]
+                                   (worker-fn cache))))))]
+        ; join them
+        (run! deref workers))
       @search-success)))
 
 (defn concurrent[threads] (Concurrent. threads (atom ()) (atom 0)))

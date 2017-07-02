@@ -4,7 +4,7 @@
 
 (defn gen-tree
   [n]
-  (map (fn[x] (rand-int x)) (range n)))
+  (map rand-int (range n)))
 
 (defn children
   [tree x]
@@ -27,7 +27,7 @@
     (strategy/with-strategy strategy
       (explore-node 0))
     (is (= @cache
-          (into #{} (range n))))))
+          (set (range n))))))
 
 (deftest recursion-test
   (test-strategy (strategy/recursion) 10))
@@ -40,4 +40,3 @@
 
 (deftest ^:fat concurrent-fat-test
   (test-strategy (strategy/concurrent 5) 20000))
-

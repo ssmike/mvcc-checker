@@ -1,6 +1,5 @@
 (ns jepsen.dyntables.history
-  (:require [clojure.tools.logging :refer [info debug]]
-            [clojure.core.match :refer [match]]))
+  (:require [clojure.tools.logging :refer [info debug]]))
 
 (defn index
   [history]
@@ -24,28 +23,33 @@
   (let [last-write (atom (transient {}))]
     (->> (reverse history)
          (map (fn [op]
-                (do
-                  (let [write-op (@last-write (:process op))]
-                    (match [(:f op) (:type op)]
-                           [:start-tx _]
-                           (if (and write-op
-                                    (not= (:type write-op) :fail))
-                             (let [_ (assert (:value write-op) (str write-op op))
-                                   locked (assoc op :locks (into #{} (keys (:value write-op))))
-                                   unlocked (assoc op :blocks true)]
-                               (if (= (:type write-op) :ok)
-                                 [locked]
-                                 [unlocked locked]))
-                             [op])
-                           [:commit _]
-                           (do
-                             (if (not= (:type op) :invoke)
-                               (swap! last-write assoc! (:process op) op))
-                             [(assoc op :locks (->> op
-                                                    :value
-                                                    keys
-                                                    (into #{})))])
-                           :else nil)))))
+                (let [write-op (@last-write (:process op))]
+                  (case (:f op)
+
+                         :start-tx
+                         (if (and write-op
+                                  (not= (:type write-op) :fail))
+                           (let [_ (assert (:value write-op) (str write-op op))
+                                 locked (assoc op :locks (-> write-op
+                                                             :value
+                                                             keys
+                                                             set))
+                                 unlocked (assoc op :blocks true)]
+                             (if (= (:type write-op) :ok)
+                               [locked]
+                               [unlocked locked]))
+                           [op])
+
+                         :commit
+                         (do
+                           (if (not= (:type op) :invoke)
+                             (swap! last-write assoc! (:process op) op))
+                           [(assoc op :locks (->> op
+                                                  :value
+                                                  keys
+                                                  (into #{})))])
+
+                         :else nil))))
          (filter vector?)
          reverse)))
 

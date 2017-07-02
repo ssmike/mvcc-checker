@@ -34,7 +34,7 @@
                 (let [saved (@cache (:process op))
                       _ (assert (= (:type op) :ok) op)
                       old-item (res saved)
-                      new-item (assoc old-item :max-index (- n 1))]
+                      new-item (assoc old-item :max-index (dec n))]
                   (assoc! res saved new-item)))))
         (transient [])
         history))
