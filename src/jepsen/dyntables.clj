@@ -6,7 +6,7 @@
             [clojure.string     :as str]
             [clojure.set        :as set]
             [clojure.data.json  :as json]
-            [jepsen.os.debian   :as debian]
+            [jepsen.os          :as os]
             [jepsen [db         :as db]
                     [cli        :as cli]
                     [checker    :as checker]
@@ -125,7 +125,7 @@
         test (merge pre-test
                {:nodes   [:n1 :n2 :n3 :n4 :n5 :master]
                 :name    "Dyntables"
-                :os      debian/os
+                :os      os/noop
                 :db      db
                 :client  (client nil)
                 :nemesis (partition-master-nodes :master [:n1 :n2 :n3 :n4 :n5] 1)
