@@ -1,27 +1,10 @@
 (ns jepsen.yt
-  (:require [clojure.data.json :as json]
-            [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [clojure.edn :as edn])
   (:import java.lang.Runtime))
 
-(defn encode
-  [op]
-  (let [allowed-keys #{:f :value :rpc-id :req-id}]
-    (json/write-str
-      (conj {} (filter (fn [[x _]]
-                         (contains? allowed-keys x))
-                       op)))))
-
-(defn decode
-  [msg]
-  (let [mp (json/read-str msg)]
-    (into {} (map (fn [[a b]] [(keyword a)
-                               ((case a
-                                  ("value" "rpc-id" "req-id" "ret")
-                                    identity
-                                    keyword)
-                                 b)])
-                  mp))))
-
+(def encode str)
+(def decode edn/read-string)
 
 (defn ysend
   [{:keys [in cache rpc-cnt]} msg]
