@@ -178,11 +178,16 @@
       (test-valid history))))
 
 (deftest ^:fat check-logs
-  (if (.exists (java.io.File. "checker-test"))
-    (checkfile "checker-test")
-    (do
-      (error "can't read checker-test")
-      (info "pwd is" (System/getProperty "user.dir")))))
+  (doseq [f (.listFiles (java.io.File. "data"))]
+    (testing (.getName f)
+      (checkfile (.getPath f)))))
+
+(deftest ^:fat check-dev-log
+  (if (.exists (java.io.File. "checker-log"))
+      (checkfile "checker-log")
+      (do
+        (error "can't read checker-log")
+        (info "pwd is" (System/getProperty "user.dir")))))
 
 (defn without-debug[f]
   (unilog/start-logging! {:console true :level "info"})
