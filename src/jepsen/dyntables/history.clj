@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :refer [info debug]]))
 
 (defn index
+  "Assign unique index to each operation and its return record."
   [history]
   (-> (reduce (fn [[index invoke-cache result] op]
                 (if (= (:type op) :invoke)
@@ -18,42 +19,44 @@
       (get 2)
       persistent!))
 
+(defn- write-set
+  [write-op]
+  (-> write-op :value keys set))
+
 (defn foldup-locks
+  "Successful commit implies that start-tx locks write-set.
+  If commit fails start-tx shouldn't lock anything.
+  And in case of :info we have to preserve both histories.
+  ATTENTION: We don't override record types and processes."
   [history]
-  (let [last-write (atom (transient {}))]
-    (->> (reverse history)
-         (map (fn [op]
-                (let [write-op (@last-write (:process op))]
-                  (case (:f op)
+  (->> (reduce (fn [[history last-write :as skip] op]
+                 (let [write-op (last-write (:process op))]
+                   (case (:f op)
+                     :start-tx
+                     [(conj! history
+                             (if (and write-op (not= (:type write-op) :fail))
+                                (let [locked (assoc op :locks (write-set write-op))
+                                      unlocked (assoc op :blocks true)]
+                                  (if (= (:type write-op) :ok)
+                                    [locked]
+                                    [unlocked locked]))
+                                 [op]))
+                      last-write]
 
-                         :start-tx
-                         (if (and write-op
-                                  (not= (:type write-op) :fail))
-                           (let [_ (assert (:value write-op) (str write-op op))
-                                 locked (assoc op :locks (-> write-op
-                                                             :value
-                                                             keys
-                                                             set))
-                                 unlocked (assoc op :blocks true)]
-                             (if (= (:type write-op) :ok)
-                               [locked]
-                               [unlocked locked]))
-                           [op])
+                     :commit
+                     [(conj! history [(assoc op :locks (write-set op))])
+                      (if (not= (:type op) :invoke)
+                        (assoc! last-write (:process op) op)
+                        last-write)]
 
-                         :commit
-                         (do
-                           (if (not= (:type op) :invoke)
-                             (swap! last-write assoc! (:process op) op))
-                           [(assoc op :locks (->> op
-                                                  :value
-                                                  keys
-                                                  (into #{})))])
+                     skip)))
 
-                         :else nil))))
-         (filter vector?)
-         reverse)))
+                     [(transient []) (transient {})] (reverse history))
+       first
+       persistent!
+       reverse))
 
-(defn merge-success
+(defn- merge-success
   [invoke-ops ok-ops]
   (if (nil? ok-ops)
     invoke-ops
@@ -63,22 +66,25 @@
           ok-ops)))
 
 (defn complete-history
+  "Here we delete faled ops. Also bring :value from each
+  return record to invoke one."
   [history]
-  (let [cache (atom (transient {}))
-        history  (->> (reverse history)
-                      (map (fn [op]
-                             (let [p (:process (first op))]
-                               (case (-> op first :type)
-                                 :ok (do
-                                       (swap! cache assoc! p op)
-                                       op)
-                                 :fail (swap! cache assoc! p :fail)
-                                 :info (swap! cache dissoc! p)
-                                 :invoke (let [saved (@cache p)]
-                                           (swap! cache dissoc! p)
-                                           (if (not= saved :fail)
-                                             (merge-success op saved)))))))
-                      (filter vector?)
-                      reverse)]
-    (assert (empty? (persistent! @cache)))
-    history))
+  (let [reduction
+        (reduce (fn [[cache history] op]
+                   (let [p (:process (first op))
+                         items
+                         (case (-> op first :type)
+                           :ok [[p op] op]
+                           :fail [[p :fail] nil]
+                           :info [[p nil] nil]
+                           :invoke [[p nil]
+                                    (let [saved (cache p)]
+                                     (if (not= saved :fail)
+                                       (merge-success op saved)))])]
+                     (mapv conj! [cache history] items)))
+                [(transient {}) (transient [])]
+                (reverse history))
+        [cache history] (map persistent! reduction)]
+    (assert (->> cache vals (filter identity) empty?)
+            "not all operations reduced")
+    (->> history (filter identity) reverse)))

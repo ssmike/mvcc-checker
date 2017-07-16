@@ -9,45 +9,8 @@
             [jepsen.dyntables [checker :as mvcc-checker]]
             [knossos [model :as model]]
             [unilog.config :as unilog]
-            [clojure.edn :as edn]))
-
-(def ^:dynamic operation-cache)
-(def ^:dynamic req-id)
-
-(defmacro hist-gen
-  [& body]
-  `(binding [operation-cache (atom (transient{}))
-             req-id (atom 0)]
-     (list ~@body)))
-
-(defn read-op[proc & kvs]
-  (let [kvs (->> kvs (partition-all 2) (map vec) (into {}))
-        id (swap! req-id inc)
-        op {:type :invoke :f :start-tx :value kvs :process proc :req-id id}]
-    (swap! operation-cache assoc! proc op)
-    (assoc op :value (map (fn[[x _]] [x nil]) kvs))))
-
-(defn write-op[proc & kvs]
-  (let [kvs (->> kvs (partition-all 2) (map vec) (into {}))
-        id (swap! req-id inc)
-        op {:type :invoke :f :commit :value kvs :process proc :req-id id}]
-    (swap! operation-cache assoc! proc op)
-    op))
-
-(defn op-fail[proc]
-  (let [op (@operation-cache proc)]
-    (swap! operation-cache dissoc! proc)
-    (assoc op :type :fail)))
-
-(defn op-hangs[proc]
-  (let [op (@operation-cache proc)]
-    (swap! operation-cache dissoc! proc)
-    (assoc op :type :info)))
-
-(defn op-ok[proc]
-  (let [op (@operation-cache proc)]
-    (swap! operation-cache dissoc! proc)
-    (assoc op :type :ok)))
+            [clojure.edn :as edn]
+            [jepsen.dyntables.history-gen :refer :all]))
 
 (defn test-valid
   [orig-history]
@@ -230,4 +193,4 @@
                           :file "debug.log"})
   (f))
 
-(use-fixtures :once to-file)
+(use-fixtures :each to-file)
