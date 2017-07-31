@@ -43,7 +43,7 @@
   (reify client/Client
     (setup! [this test node]
         (info "waiting for yt")
-        (let [sock (yt/start-client)]
+        (let [sock (yt/start-client test)]
           (info "waiting for master")
           (yt/wait-master sock)
           (info "mounting dyn-table")

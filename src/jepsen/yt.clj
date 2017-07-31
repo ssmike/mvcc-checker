@@ -1,6 +1,7 @@
 (ns jepsen.yt
   (:require [clojure.java.io :as io]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [jepsen.store :as store])
   (:import java.lang.Runtime))
 
 (def encode str)
@@ -26,10 +27,11 @@
 (def proxy-num (atom 0))
 
 (defn start-client
-  []
+  [test]
   (let [cnt (swap! proxy-num inc)
         proc (.exec (Runtime/getRuntime)
-                (into-array ["run-proxy.sh" (str cnt)]))
+                (into-array ["run-proxy.sh" (.getCanonicalPath
+                                              (store/path! test (str "proxy-" cnt ".log")))]))
         cache (atom {})
         out (io/reader (.getInputStream proc))
         worker (fn []
