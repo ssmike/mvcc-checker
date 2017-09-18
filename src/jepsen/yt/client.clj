@@ -2,7 +2,8 @@
   (:require [jepsen.client :as client]
             [jepsen.util :refer [timeout]]
             [clojure.tools.logging :refer [info warn error debug]]
-            [clojure.java.shell :refer [sh]])
+            [clojure.java.shell :refer [sh]]
+            [jepsen.store :as store])
   (:import io.netty.channel.nio.NioEventLoopGroup
            java.util.LinkedList
            java.util.function.BiFunction
@@ -72,13 +73,14 @@
        (let [{:keys [host port path] :as rpc-opts} (:rpc-opts test)]
          (info "waiting for mounted table")
          (compare-and-set! mount-table nil (delay (sh "/control/setup-test.sh" path)))
-         @mount-table
+         (deref @mount-table)
          (let [rpc-client (-> rpc-opts
                               (rpc-options)
                               (create-client host port))]
            (client (assoc rpc-opts
                           :tx (atom nil)
                           :last-op (atom nil)
+                          :logs-copied (atom nil)
                           :rpc-client rpc-client)))))
 
      (invoke! [this test op]
@@ -134,4 +136,9 @@
                (assoc op :type :fail))))))
 
      (teardown! [_ test]
-       (reset! mount-table nil))))
+       (reset! mount-table nil)
+       (let [log (.getCanonicalPath (store/path! test (str "proxy")))]
+         (compare-and-set! (:logs-copied opts)
+                           nil
+                           (delay (doseq [ext [".log", ".debug.log"]]
+                                    (sh "cp" (str "/control/proxy" ext) (str log ext)))))))))
