@@ -66,7 +66,7 @@
                 :name    "Dyntables"
                 :os      os/noop
                 :db      db
-                :rpc-opts {:host "localhost" :port 3000 :path "//table"}
+                :rpc-opts {:host "::" :port 3000 :path "//table"}
                 :client  (yt-client/client nil);(client nil)
                 :nemesis (partition-master-nodes :master [:n1 :n2 :n3 :n4 :n5] 1)
                 :timeout timeout
