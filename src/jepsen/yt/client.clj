@@ -5,6 +5,7 @@
             [clojure.java.shell :refer [sh]])
   (:import io.netty.channel.nio.NioEventLoopGroup
            java.util.LinkedList
+           java.util.function.BiFunction
            ru.yandex.yt.ytclient.bus.DefaultBusConnector
            ru.yandex.yt.ytclient.bus.DefaultBusFactory
            ru.yandex.yt.ytclient.proxy.ApiServiceClient
@@ -49,12 +50,19 @@
 
 (def mount-table (atom nil))
 
-(def schema
+(def write-schema
   (delay
     (-> (TableSchema$Builder.)
         (.addKey "key" ColumnValueType/INT64)
         (.addValue "value" ColumnValueType/INT64)
         .build)))
+
+(def lookup-schema
+  (delay
+    (-> (TableSchema$Builder.)
+        (.addKey "key" ColumnValueType/INT64)
+        .build)))
+
 
 (defn client
   [opts]
@@ -80,25 +88,31 @@
            (merge op
                   (case (:f op)
                     :start-tx
-                    (do
-                      (as-> rpc-client f
-                           (.startTransaction f (ApiServiceTransactionOptions. ETransactionType/TABLET))
-                           (.join f)
-                           (reset! tx f))
-                      (let [req (-> (reduce
-                                        (fn [req [key val]]
-                                          (.addFilter req (LinkedList. [key]))
-                                        (LookupRowsRequest. path @schema)
-                                        (:value op)))
-                                    (.addLookupColumns (LinkedList. ["key"])))
-                            result (-> (.lookupRows @tx req)
-                                       .join
-                                       .getYTreeRows)]
-                        {:value (reduce {}
-                                        (fn [map row]
-                                          (let [key (-> row (.get "key") .longValue)
-                                                val (-> row (.get "value") .longValue)]
-                                            (assoc map key val))))}))
+                    (let [req (-> (reduce
+                                      (fn [req [key val]]
+                                        (.addFilter req (LinkedList. [key])))
+                                      (LookupRowsRequest. path @lookup-schema)
+                                      (:value op))
+                                  (.addLookupColumns (LinkedList. ["key"])))
+                          result (-> rpc-client
+                                   (.startTransaction (ApiServiceTransactionOptions. ETransactionType/TABLET))
+                                   (.handleAsync
+                                     (reify BiFunction
+                                       (apply [_ transaction err]
+                                         (if err (throw err))
+                                         (let [result (-> transaction
+                                                          (.lookupRows req)
+                                                          .join
+                                                          .getYTreeRows)]
+                                           (reset! tx transaction)
+                                           result))))
+                                   .join)]
+                      {:value (reduce (fn [map row]
+                                        (let [key (-> row (.get "key") .longValue)
+                                              val (-> row (.get "value") .longValue)]
+                                          (assoc map key val)))
+                                      {}
+                                      result)})
 
                     :commit
                     (if @tx
@@ -106,7 +120,7 @@
                         (let [req (-> (reduce
                                         (fn [req [key val]]
                                           (.addInsert (list key val)))
-                                        (ModifyRowsRequest. path @schema)
+                                        (ModifyRowsRequest. path @write-schema)
                                         (:value op)))
                               _ (-> (.modifyRows rpc-client req) .join)
                               _ (-> @tx .commit .join)])
