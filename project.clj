@@ -5,9 +5,10 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :repositories [["artifactory" {:url "http://artifactory.yandex.net/artifactory/yandex_media_releases"}]]
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [jepsen "0.1.6-SNAPSHOT"]
+                 [jepsen "0.1.6"]
                  [org.clojure/data.json "0.2.6"]
-                 [spootnik/unilog "0.7.20"]]
+                 [spootnik/unilog "0.7.21"]
+                 [ru.yandex/yt-java-ytclient "3163786"]]
   :main jepsen.dyntables
   :target-path "target/%s"
   :jvm-opts ["-Xmx10g"
@@ -26,6 +27,4 @@
   :omit-source true
   :test-selectors {:default (complement :fat)
                    :all (constantly true)}
-  :profiles {:uberjar {:aot :all
-                       :dependencies [[ru.yandex/yt-java-ytclient "3059670"]]}
-             :dev {:dependencies [[ru.yandex/yt-java-ytclient "3059670"]]}})
+  :profiles {:uberjar {:aot :all}})
