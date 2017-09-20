@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.wgl.strategy
+(ns jepsen.mvcc.wgl.strategy
   (:require [clojure.tools.logging :refer [info debug]]))
 
 (defprotocol IExecutionStrategy

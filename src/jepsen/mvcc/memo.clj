@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.memo
+(ns jepsen.mvcc.memo
   (:require [knossos.model :as model]
             [clojure.tools.logging :refer [info debug]])
   (:import (knossos.model Model)))

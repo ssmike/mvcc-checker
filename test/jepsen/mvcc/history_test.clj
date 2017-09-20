@@ -1,7 +1,7 @@
-(ns jepsen.dyntables.history-test
-  (:require [jepsen.dyntables.history :as history]
+(ns jepsen.mvcc.history-test
+  (:require [jepsen.mvcc.history :as history]
             [clojure.test :refer :all]
-            [jepsen.dyntables.history-gen :refer :all]
+            [jepsen.mvcc.history-gen :refer :all]
             [clojure.tools.logging :refer [error debug info]]
             [unilog.config :as unilog]))
 

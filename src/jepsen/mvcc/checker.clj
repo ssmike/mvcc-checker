@@ -1,7 +1,7 @@
-(ns jepsen.dyntables.checker
+(ns jepsen.mvcc.checker
   (:require [clojure.java.io :as io]
             [jepsen.checker :as checker]
-            [jepsen.dyntables [history :as history]
+            [jepsen.mvcc [history :as history]
                               [wgl     :as wgl]
                               [history :as history]
                               [memo    :as memo]]))

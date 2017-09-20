@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.history
+(ns jepsen.mvcc.history
   (:require [clojure.tools.logging :refer [info debug]]))
 
 (defn index

@@ -1,5 +1,5 @@
-(ns jepsen.dyntables.wgl.history
-  (:require [jepsen.dyntables.wgl.util :refer :all]))
+(ns jepsen.mvcc.wgl.history
+  (:require [jepsen.mvcc.wgl.util :refer :all]))
 
 (def ^:dynamic *id-index-mapping* (atom nil))
 

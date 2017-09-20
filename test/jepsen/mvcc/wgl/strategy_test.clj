@@ -1,6 +1,6 @@
-(ns jepsen.dyntables.wgl.strategy-test
+(ns jepsen.mvcc.wgl.strategy-test
   (:require [clojure.test :refer :all]
-            [jepsen.dyntables.wgl.strategy :as strategy]))
+            [jepsen.mvcc.wgl.strategy :as strategy]))
 
 (defn gen-tree
   [n]

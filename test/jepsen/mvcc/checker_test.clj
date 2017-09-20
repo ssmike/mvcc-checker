@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.checker-test
+(ns jepsen.mvcc.checker-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [clojure.tools.logging :refer [info warn error]]
@@ -6,11 +6,11 @@
                     [checker    :as checker]
                     [generator  :as gen]
                     [tests :as tests]]
-            [jepsen.dyntables [checker :as mvcc-checker]]
+            [jepsen.mvcc [checker :as mvcc-checker]]
             [knossos [model :as model]]
             [unilog.config :as unilog]
             [clojure.edn :as edn]
-            [jepsen.dyntables.history-gen :refer :all]))
+            [jepsen.mvcc.history-gen :refer :all]))
 
 (defn test-valid
   [orig-history]

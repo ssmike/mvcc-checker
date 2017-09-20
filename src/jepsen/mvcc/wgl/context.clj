@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.wgl.context
+(ns jepsen.mvcc.wgl.context
   (:import [java.util.concurrent ConcurrentHashMap]))
 
 (defn update-found

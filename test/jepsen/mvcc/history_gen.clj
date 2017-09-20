@@ -1,4 +1,4 @@
-(ns jepsen.dyntables.history-gen)
+(ns jepsen.mvcc.history-gen)
             
 
 (def ^:dynamic current-history)

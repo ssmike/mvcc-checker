@@ -1,5 +1,5 @@
-(ns jepsen.dyntables.wgl
-  (:require [jepsen.dyntables.wgl [context :as ctx]
+(ns jepsen.mvcc.wgl
+  (:require [jepsen.mvcc.wgl [context :as ctx]
                                   [strategy :as strategy]
                                   [history :refer [make-sequential *id-index-mapping*]]
                                   [util :refer :all]]
