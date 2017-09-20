@@ -3,7 +3,8 @@
             [jepsen.util :refer [timeout]]
             [clojure.tools.logging :refer [info warn error debug]]
             [clojure.java.shell :refer [sh]]
-            [jepsen.store :as store])
+            [jepsen.store :as store]
+            [clojure.data.json :as json])
   (:import io.netty.channel.nio.NioEventLoopGroup
            java.util.LinkedList
            java.util.function.BiFunction
@@ -64,6 +65,14 @@
         (.addKey "key" ColumnValueType/INT64)
         .build)))
 
+(def lookup-map
+  {0 2, 1 21, 2 31, 3 41, 4 51})
+
+(def shards
+  [[], [20], [30], [40], [50]])
+
+(def inv-lookup-map
+  (into {} (map (fn [[fs sc]] [sc fs]) lookup-map)))
 
 (defn client
   [opts]
@@ -72,7 +81,12 @@
      (setup! [this test node]
        (let [{:keys [host port path] :as rpc-opts} (:rpc-opts test)]
          (info "waiting for mounted table")
-         (compare-and-set! mount-table nil (delay (sh "/control/setup-test.sh" path)))
+         (compare-and-set! mount-table nil
+                           (delay (sh
+                                    "/control/setup-test.sh"
+                                    path
+                                    (json/write-str (map lookup-map (range (count lookup-map))))
+                                    (json/write-str shards))))
          (deref @mount-table)
          (let [rpc-client (-> rpc-opts
                               (rpc-options)
@@ -91,13 +105,15 @@
                   (case (:f op)
                     :start-tx
                     (let [req (-> (reduce
-                                      (fn [req [key val]]
-                                        (.addFilter req (LinkedList. [key])))
+                                      (fn [req [key _]]
+                                        (.addFilter req (LinkedList. [(lookup-map key)])))
                                       (LookupRowsRequest. path @lookup-schema)
                                       (:value op))
-                                  (.addLookupColumns (LinkedList. ["key"])))
+                                  (.addLookupColumns (LinkedList. ["key" "value"])))
                           result (-> rpc-client
-                                   (.startTransaction (ApiServiceTransactionOptions. ETransactionType/TABLET))
+                                   (.startTransaction (-> ETransactionType/TABLET
+                                                          ApiServiceTransactionOptions.
+                                                          (.setSticky true)))
                                    (.handleAsync
                                      (reify BiFunction
                                        (apply [_ transaction err]
@@ -110,30 +126,37 @@
                                            result))))
                                    .join)]
                       {:value (reduce (fn [map row]
-                                        (let [key (-> row (.get "key") .longValue)
+                                        (let [key (-> row (.get "key") .longValue inv-lookup-map)
                                               val (-> row (.get "value") .longValue)]
                                           (assoc map key val)))
                                       {}
-                                      result)})
+                                      result)
+                       :type :ok})
 
                     :commit
                     (if @tx
                       (do
                         (let [req (-> (reduce
                                         (fn [req [key val]]
-                                          (.addInsert (list key val)))
+                                          (.addInsert req (list (lookup-map key) val)))
                                         (ModifyRowsRequest. path @write-schema)
                                         (:value op)))
-                              _ (-> (.modifyRows rpc-client req) .join)
+                              _ (-> (.modifyRows @tx req) .join)
                               _ (-> @tx .commit .join)])
-                        (reset! tx nil))
+                        (reset! tx nil)
+                        {:type :ok})
                       {:type :fail})))
+           (catch java.util.concurrent.CompletionException e
+             (let [e (.getCause e)]
+               (reset! tx nil)
+               (if (and (#{:commit :write} @last-op)
+                        (not= (-> e .getError .getCode) 1700))
+                 (assoc op :type :info, :error :timeout)
+                 (assoc op :type :fail))))
            (catch Exception e
              (.printStackTrace e)
-             (reset! tx nil)
-             (if (#{:commit :write} @last-op)
-               (assoc op :type :info, :error :timeout)
-               (assoc op :type :fail))))))
+             (error "fatal error")
+             {:type :info :error :fatal}))))
 
      (teardown! [_ test]
        (reset! mount-table nil)

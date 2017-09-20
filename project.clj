@@ -8,6 +8,7 @@
                  [jepsen "0.1.6"]
                  [org.clojure/data.json "0.2.6"]
                  [spootnik/unilog "0.7.21"]
+                 [org.clojure/data.json "0.2.6"]
                  [ru.yandex/yt-java-ytclient "3163786"]]
   :main jepsen.dyntables
   :target-path "target/%s"
