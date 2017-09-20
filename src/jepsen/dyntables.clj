@@ -16,7 +16,6 @@
                     [tests      :as tests]
                     [util       :refer [timeout]]
                     [net        :as net]
-                    [yt         :as yt]
                     [yt-models  :as models]]
             [jepsen.yt.client   :as yt-client]
             [jepsen.dyntables.checker :as mvcc-checker]
@@ -37,23 +36,6 @@
         (case node
           :master ["/master/master.debug.log" "/master/master.log"]
           ["/node/node.debug.log" "/node/node.log"]))))
-
-(defn client
-  [con]
-  (reify client/Client
-    (setup! [this test node]
-        (info "waiting for yt")
-        (let [sock (yt/start-client test)]
-          (info "waiting for master")
-          (yt/wait-master sock)
-          (info "mounting dyn-table")
-          (yt/verify-table-mounted sock)
-          (info "yt proxy set up")
-          (client sock)))
-    (invoke! [this test op]
-      (timeout 6500 (assoc op :type :info, :error :timeout)
-        (merge op (yt/ysend con op))))
-    (teardown! [_ test] (yt/close con))))
 
 (defn d-test
   "Given an options map from the command-line runner (e.g. :nodes, :ssh,
