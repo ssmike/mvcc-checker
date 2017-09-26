@@ -20,6 +20,7 @@
              "-server"]
   :plugins [[jonase/eastwood "0.2.4"]
             [lein-kibit "0.1.5"]]
+  :aot [jepsen.mvcc.checker]
   :omit-source true
   :test-selectors {:default (complement :fat)
                    :all (constantly true)}
