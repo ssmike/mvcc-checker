@@ -1,4 +1,4 @@
-(defproject mvcc-checker "1.0-SNAPSHOT"
+(defproject com.ssmike/mvcc-checker "1.0-SNAPSHOT"
   :description "mvcc checker compatible with jepsen framework"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
