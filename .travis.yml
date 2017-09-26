@@ -1,5 +1,6 @@
 language: clojure		
-  script:		
+
+script:		
     - lein test :all		
     - lein eastwood		
     - lein kibit		
