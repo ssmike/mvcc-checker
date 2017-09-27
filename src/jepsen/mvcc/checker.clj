@@ -21,7 +21,7 @@
 (def snapshot-serializable
   (reify checker/Checker
     (check [this test model orig-history opts]
-      (let [indexed-history (-> orig-history history/index)
+      (let [indexed-history (history/index orig-history)
             history (-> indexed-history
                         history/foldup-locks
                         history/complete-history)
