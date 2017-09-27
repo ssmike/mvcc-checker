@@ -1,5 +1,6 @@
 (ns jepsen.mvcc.checker
-  (:require [clojure.java.io :as io]
+  (:require [clojure.tools.logging :refer [debug info]]
+            [clojure.java.io :as io]
             [jepsen.checker :as checker]
             [jepsen.mvcc [history :as history]
                               [wgl     :as wgl]
@@ -8,7 +9,9 @@
 
 (defn -diagnostics
   ([orig-history diag-history num]
-   (take num (-diagnostics orig-history diag-history)))
+   (->> (-diagnostics orig-history diag-history)
+        (take num)
+        (into '())))
   ([orig-history diag-history]
    (let [ids (set diag-history)]
       (->> orig-history
@@ -18,8 +21,8 @@
 (def snapshot-serializable
   (reify checker/Checker
     (check [this test model orig-history opts]
-      (let [history (-> orig-history
-                        history/index
+      (let [indexed-history (-> orig-history history/index)
+            history (-> indexed-history
                         history/foldup-locks
                         history/complete-history)
             memo (memo/memo model history)
@@ -30,7 +33,7 @@
             [diag-state diag-hist] (:best res)]
         (assoc res :state ((:models memo) diag-state)
                    :best (-diagnostics
-                           orig-history
+                           indexed-history
                            diag-hist
                            20))))
     java.lang.Object

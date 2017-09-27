@@ -24,7 +24,7 @@
         diag-hist (:best result)
         message  (str "according to checker history is invalid\n"
                       "state - " diag-state "\n"
-                      diag-hist
+                      diag-hist "\n"
                       "left " (count diag-hist) " entries out of " (count orig-history) "\n")]
      (is (:valid? result) message)))
 
