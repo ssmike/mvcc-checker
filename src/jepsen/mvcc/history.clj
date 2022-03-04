@@ -1,5 +1,5 @@
 (ns jepsen.mvcc.history
-  (:require [clojure.tools.logging :refer [info debug]]))
+  (:require [clojure.tools.logging :refer [info debug]))
 
 (defn index
   "Assign unique index to each operation and its return record."
